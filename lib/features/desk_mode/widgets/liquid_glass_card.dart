@@ -118,16 +118,16 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
                       ),
                       colors: [
                         hasColors
-                            ? primaryColor.withValues(alpha: 0.16)
+                            ? primaryColor.withValues(alpha: 0.22)
                             : Colors.white.withValues(alpha: 0.12),
                         hasColors
-                            ? secondaryColor.withValues(alpha: 0.08)
+                            ? secondaryColor.withValues(alpha: 0.14)
                             : Colors.white.withValues(alpha: 0.04),
                       ],
                     ),
                     border: Border.all(
                       color: hasColors
-                          ? primaryColor.withValues(alpha: 0.28)
+                          ? primaryColor.withValues(alpha: 0.36)
                           : Colors.white.withValues(alpha: 0.16),
                       width: 1.0,
                     ),
@@ -251,7 +251,7 @@ class _LiquidMeshPainter extends CustomPainter {
     final paint1 = Paint()
       ..shader = RadialGradient(
         colors: [
-          color1.withValues(alpha: 0.38),
+          color1.withValues(alpha: 0.44),
           color1.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromCircle(center: c1, radius: r1));
@@ -259,7 +259,7 @@ class _LiquidMeshPainter extends CustomPainter {
     final paint2 = Paint()
       ..shader = RadialGradient(
         colors: [
-          color2.withValues(alpha: 0.32),
+          color2.withValues(alpha: 0.38),
           color2.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromCircle(center: c2, radius: r2));
@@ -267,7 +267,7 @@ class _LiquidMeshPainter extends CustomPainter {
     final paint3 = Paint()
       ..shader = RadialGradient(
         colors: [
-          color3.withValues(alpha: 0.26),
+          color3.withValues(alpha: 0.30),
           color3.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromCircle(center: c3, radius: r3));

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../app/theme.dart';
 import '../../models/app_settings.dart';
 import '../../models/media_info.dart';
+import '../../services/artwork_palette_extractor.dart';
 import '../../services/battery_service.dart';
 import '../../services/clock_service.dart';
 import '../../services/media_controller_service.dart';
@@ -85,22 +86,20 @@ class _DeskModeScreenState extends State<DeskModeScreen>
       return;
     }
 
-    final hash = artworkBytes.hashCode;
+    final hash = Object.hash(
+      artworkBytes.length,
+      artworkBytes.first,
+      artworkBytes.last,
+      artworkBytes[artworkBytes.length ~/ 2],
+    );
     if (hash == _lastArtworkHash) return;
     _lastArtworkHash = hash;
 
-    ColorScheme.fromImageProvider(
-      provider: MemoryImage(artworkBytes),
-      brightness: Brightness.dark,
-    ).then((scheme) {
+    ArtworkPaletteExtractor.extract(artworkBytes).then((palette) {
       if (mounted) {
         setState(() {
-          _artworkAccentColor = scheme.primary;
-          _artworkColors = [
-            scheme.primary,
-            scheme.secondary,
-            scheme.tertiary,
-          ];
+          _artworkAccentColor = palette.primary;
+          _artworkColors = palette.allColors;
         });
       }
     }).catchError((_) {});
