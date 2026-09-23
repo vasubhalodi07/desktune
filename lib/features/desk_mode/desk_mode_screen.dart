@@ -385,27 +385,32 @@ class _DeskModeScreenState extends State<DeskModeScreen>
           ),
         ),
 
-        // Right Half: Liquid Glass Music Card + Outside Sliders
+        // Right Half: Liquid Glass Music Card + Horizontal Sliders Below
         Expanded(
           flex: 6,
           child: Padding(
-            padding: const EdgeInsets.only(right: 20, top: 14, bottom: 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: LiquidGlassCard(
-                    borderRadius: 28,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                    accentColor: _artworkAccentColor,
-                    child: media.hasActiveSession && media.hasContent
-                        ? _buildActiveCardContent(media, false)
-                        : _buildEmptyCardContent(),
-                  ),
+            padding: const EdgeInsets.only(right: 20, top: 12, bottom: 12),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    LiquidGlassCard(
+                      borderRadius: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      accentColor: _artworkAccentColor,
+                      child: media.hasActiveSession && media.hasContent
+                          ? _buildActiveCardContent(media, false)
+                          : _buildEmptyCardContent(),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildHorizontalSliders(height: 36.0),
+                  ],
                 ),
-                const SizedBox(width: 14),
-                _buildControlSliders(isExpanded: false),
-              ],
+              ),
             ),
           ),
         ),
@@ -483,40 +488,36 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     return Center(
       key: const ValueKey(DeskViewMode.fullMusic),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
+        constraints: const BoxConstraints(maxWidth: 540),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: LiquidGlassCard(
-                      borderRadius: 32,
-                      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
-                      accentColor: _artworkAccentColor,
-                      child: media.hasActiveSession && media.hasContent
-                          ? _buildActiveCardContent(media, true)
-                          : _buildEmptyCardContent(),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  _buildControlSliders(isExpanded: true),
-                ],
+              LiquidGlassCard(
+                borderRadius: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+                accentColor: _artworkAccentColor,
+                child: media.hasActiveSession && media.hasContent
+                    ? _buildActiveCardContent(media, true)
+                    : _buildEmptyCardContent(),
               ),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () => _setViewMode(DeskViewMode.dual),
-                child: Text(
-                  'TAP TO RETURN TO SPLIT STANDBY',
-                  style: TextStyle(
-                    fontFamily: 'Comfortaa',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.25),
-                    letterSpacing: 1.5,
+              const SizedBox(height: 14),
+              _buildHorizontalSliders(height: 38.0),
+              const SizedBox(height: 14),
+              Center(
+                child: GestureDetector(
+                  onTap: () => _setViewMode(DeskViewMode.dual),
+                  child: Text(
+                    'TAP TO RETURN TO SPLIT STANDBY',
+                    style: TextStyle(
+                      fontFamily: 'Comfortaa',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.25),
+                      letterSpacing: 1.5,
+                    ),
                   ),
                 ),
               ),
@@ -626,25 +627,27 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     );
   }
 
-  Widget _buildControlSliders({required bool isExpanded}) {
-    final height = isExpanded ? 154.0 : 138.0;
+  Widget _buildHorizontalSliders({double height = 36.0}) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        IosControlSlider(
-          type: IosSliderType.brightness,
-          valueListenable: widget.mediaService.brightness,
-          onChanged: (val) => widget.mediaService.setBrightness(val),
-          width: 44.0,
-          height: height,
+        Expanded(
+          child: IosControlSlider(
+            type: IosSliderType.brightness,
+            orientation: Axis.horizontal,
+            valueListenable: widget.mediaService.brightness,
+            onChanged: (val) => widget.mediaService.setBrightness(val),
+            height: height,
+          ),
         ),
-        const SizedBox(width: 10),
-        IosControlSlider(
-          type: IosSliderType.volume,
-          valueListenable: widget.mediaService.volumeRatio,
-          onChanged: (val) => widget.mediaService.setVolume(val),
-          width: 44.0,
-          height: height,
+        const SizedBox(width: 12),
+        Expanded(
+          child: IosControlSlider(
+            type: IosSliderType.volume,
+            orientation: Axis.horizontal,
+            valueListenable: widget.mediaService.volumeRatio,
+            onChanged: (val) => widget.mediaService.setVolume(val),
+            height: height,
+          ),
         ),
       ],
     );

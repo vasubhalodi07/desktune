@@ -9,16 +9,18 @@ class IosControlSlider extends StatefulWidget {
   final IosSliderType type;
   final ValueListenable<double> valueListenable;
   final ValueChanged<double> onChanged;
-  final double width;
+  final double? width;
   final double height;
+  final Axis orientation;
 
   const IosControlSlider({
     super.key,
     required this.type,
     required this.valueListenable,
     required this.onChanged,
-    this.width = 44.0,
-    this.height = 136.0,
+    this.width,
+    this.height = 36.0,
+    this.orientation = Axis.horizontal,
   });
 
   @override
@@ -82,8 +84,14 @@ class _IosControlSliderState extends State<IosControlSlider> {
     });
   }
 
-  void _handleTouch(Offset localPosition) {
-    final ratio = (1.0 - (localPosition.dy / widget.height)).clamp(0.0, 1.0);
+  void _handleTouch(Offset localPosition, double totalLength) {
+    if (totalLength <= 0) return;
+    final double ratio;
+    if (widget.orientation == Axis.vertical) {
+      ratio = (1.0 - (localPosition.dy / totalLength)).clamp(0.0, 1.0);
+    } else {
+      ratio = (localPosition.dx / totalLength).clamp(0.0, 1.0);
+    }
     _onSliderChanged(ratio);
   }
 
@@ -106,74 +114,134 @@ class _IosControlSliderState extends State<IosControlSlider> {
   @override
   Widget build(BuildContext context) {
     final currentVal = (_dragValue ?? widget.valueListenable.value).clamp(0.0, 1.0);
-    // Dynamic contrast inversion matching iOS Control Center:
-    // If fill level is higher than icon position (~0.22), icon becomes dark charcoal; otherwise white.
-    final iconColor = currentVal > 0.22
-        ? const Color(0xFF2C2C2E)
-        : Colors.white.withValues(alpha: 0.88);
+    final isHorizontal = widget.orientation == Axis.horizontal;
 
-    return GestureDetector(
-      onVerticalDragStart: (details) => _handleTouch(details.localPosition),
-      onVerticalDragUpdate: (details) => _handleTouch(details.localPosition),
-      onVerticalDragEnd: (_) => _onSliderChangeEnd(currentVal),
-      onTapDown: (details) {
-        _handleTouch(details.localPosition);
-        _onSliderChangeEnd((1.0 - (details.localPosition.dy / widget.height)).clamp(0.0, 1.0));
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: widget.width,
-        height: widget.height,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(widget.width / 2),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.16),
-            width: 0.8,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            // Filled portion rising from the bottom
-            FractionallySizedBox(
-              heightFactor: currentVal,
-              widthFactor: 1.0,
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalLength = isHorizontal
+            ? (widget.width ?? constraints.maxWidth)
+            : widget.height;
+
+        final bool isFilledOverIcon;
+        if (isHorizontal) {
+          isFilledOverIcon = (currentVal * totalLength) > 28.0;
+        } else {
+          isFilledOverIcon = currentVal > 0.22;
+        }
+
+        final iconColor = isFilledOverIcon
+            ? const Color(0xFF2C2C2E)
+            : Colors.white.withValues(alpha: 0.88);
+
+        final radius = isHorizontal
+            ? widget.height / 2
+            : ((widget.width ?? 44.0) / 2);
+
+        return GestureDetector(
+          onVerticalDragStart: isHorizontal
+              ? null
+              : (details) => _handleTouch(details.localPosition, totalLength),
+          onVerticalDragUpdate: isHorizontal
+              ? null
+              : (details) => _handleTouch(details.localPosition, totalLength),
+          onVerticalDragEnd: isHorizontal
+              ? null
+              : (_) => _onSliderChangeEnd(currentVal),
+          onHorizontalDragStart: isHorizontal
+              ? (details) => _handleTouch(details.localPosition, totalLength)
+              : null,
+          onHorizontalDragUpdate: isHorizontal
+              ? (details) => _handleTouch(details.localPosition, totalLength)
+              : null,
+          onHorizontalDragEnd: isHorizontal
+              ? (_) => _onSliderChangeEnd(currentVal)
+              : null,
+          onTapDown: (details) {
+            _handleTouch(details.localPosition, totalLength);
+            final double tapRatio;
+            if (isHorizontal) {
+              tapRatio = (details.localPosition.dx / totalLength).clamp(0.0, 1.0);
+            } else {
+              tapRatio = (1.0 - (details.localPosition.dy / totalLength)).clamp(0.0, 1.0);
+            }
+            _onSliderChangeEnd(tapRatio);
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: widget.width,
+            height: widget.height,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.16),
+                width: 0.8,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-
-            // Icon placed at bottom inside the pill
-            Positioned(
-              bottom: 14,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 150),
-                  child: Icon(
-                    _getIcon(currentVal),
-                    key: ValueKey('${widget.type}_${currentVal > 0.02}'),
-                    size: 20,
-                    color: iconColor,
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              alignment: isHorizontal
+                  ? Alignment.centerLeft
+                  : Alignment.bottomCenter,
+              children: [
+                // Filled portion
+                FractionallySizedBox(
+                  widthFactor: isHorizontal ? currentVal : 1.0,
+                  heightFactor: isHorizontal ? 1.0 : currentVal,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
+
+                // Icon
+                if (isHorizontal)
+                  Positioned(
+                    left: 11,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 150),
+                        child: Icon(
+                          _getIcon(currentVal),
+                          key: ValueKey('${widget.type}_${currentVal > 0.02}'),
+                          size: 16,
+                          color: iconColor,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    bottom: 14,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 150),
+                        child: Icon(
+                          _getIcon(currentVal),
+                          key: ValueKey('${widget.type}_${currentVal > 0.02}'),
+                          size: 20,
+                          color: iconColor,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
