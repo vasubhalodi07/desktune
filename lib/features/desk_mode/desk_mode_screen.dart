@@ -385,18 +385,27 @@ class _DeskModeScreenState extends State<DeskModeScreen>
           ),
         ),
 
-        // Right Half: Liquid Glass Music Card
+        // Right Half: Liquid Glass Music Card + Outside Sliders
         Expanded(
           flex: 6,
           child: Padding(
             padding: const EdgeInsets.only(right: 20, top: 14, bottom: 14),
-            child: LiquidGlassCard(
-              borderRadius: 28,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              accentColor: _artworkAccentColor,
-              child: media.hasActiveSession && media.hasContent
-                  ? _buildActiveCardContent(media, false)
-                  : _buildEmptyCardContent(),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: LiquidGlassCard(
+                    borderRadius: 28,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    accentColor: _artworkAccentColor,
+                    child: media.hasActiveSession && media.hasContent
+                        ? _buildActiveCardContent(media, false)
+                        : _buildEmptyCardContent(),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                _buildControlSliders(isExpanded: false),
+              ],
             ),
           ),
         ),
@@ -474,19 +483,28 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     return Center(
       key: const ValueKey(DeskViewMode.fullMusic),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: const BoxConstraints(maxWidth: 620),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              LiquidGlassCard(
-                borderRadius: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-                accentColor: _artworkAccentColor,
-                child: media.hasActiveSession && media.hasContent
-                    ? _buildActiveCardContent(media, true)
-                    : _buildEmptyCardContent(),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: LiquidGlassCard(
+                      borderRadius: 32,
+                      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+                      accentColor: _artworkAccentColor,
+                      child: media.hasActiveSession && media.hasContent
+                          ? _buildActiveCardContent(media, true)
+                          : _buildEmptyCardContent(),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  _buildControlSliders(isExpanded: true),
+                ],
               ),
               const SizedBox(height: 12),
               GestureDetector(
@@ -512,161 +530,121 @@ class _DeskModeScreenState extends State<DeskModeScreen>
   Widget _buildActiveCardContent(MediaInfo media, bool isExpanded) {
     final artworkSize = isExpanded ? 90.0 : 68.0;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Left Column: Music Artwork, Info, Seek Slider & Controls
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Artwork + Track info row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  MusicArtwork(
-                    artworkBytes: media.artworkBytes,
-                    size: artworkSize,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: MusicInfo(
-                      title: media.title,
-                      artist: media.artist,
-                      album: media.album,
-                      isExpanded: isExpanded,
-                      isPlaying: media.isPlaying,
-                      hasActiveSession: media.hasActiveSession,
-                      accentColor: _artworkAccentColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Progress bar with timing
-              ProgressSlider(
-                media: media,
-                onSeek: (pos) => widget.mediaService.seekTo(pos),
-              ),
-              const SizedBox(height: 6),
-
-              // Playback controls (iOS Cupertino icons)
-              MusicControls(
-                media: media,
-                size: isExpanded ? 52 : 44,
-                onPrevious: () => widget.mediaService.previous(),
-                onTogglePlayPause: () => widget.mediaService.togglePlayPause(),
-                onNext: () => widget.mediaService.next(),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(width: 16),
-
-        // Right Column: iOS Control Center Vertical Sliders (Brightness & Volume)
+        // Artwork + Track info row
         Row(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            IosControlSlider(
-              type: IosSliderType.brightness,
-              valueListenable: widget.mediaService.brightness,
-              onChanged: (val) => widget.mediaService.setBrightness(val),
-              width: 44.0,
-              height: isExpanded ? 148.0 : 134.0,
+            MusicArtwork(
+              artworkBytes: media.artworkBytes,
+              size: artworkSize,
             ),
-            const SizedBox(width: 10),
-            IosControlSlider(
-              type: IosSliderType.volume,
-              valueListenable: widget.mediaService.volumeRatio,
-              onChanged: (val) => widget.mediaService.setVolume(val),
-              width: 44.0,
-              height: isExpanded ? 148.0 : 134.0,
+            const SizedBox(width: 12),
+            Expanded(
+              child: MusicInfo(
+                title: media.title,
+                artist: media.artist,
+                album: media.album,
+                isExpanded: isExpanded,
+                isPlaying: media.isPlaying,
+                hasActiveSession: media.hasActiveSession,
+                accentColor: _artworkAccentColor,
+              ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+
+        // Progress bar with timing
+        ProgressSlider(
+          media: media,
+          onSeek: (pos) => widget.mediaService.seekTo(pos),
+        ),
+        const SizedBox(height: 6),
+
+        // Playback controls (iOS Cupertino icons)
+        MusicControls(
+          media: media,
+          size: isExpanded ? 52 : 44,
+          onPrevious: () => widget.mediaService.previous(),
+          onTogglePlayPause: () => widget.mediaService.togglePlayPause(),
+          onNext: () => widget.mediaService.next(),
         ),
       ],
     );
   }
 
   Widget _buildEmptyCardContent() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Left Column: No Music placeholder
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.08),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Icon(
-                    CupertinoIcons.music_note,
-                    size: 28,
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'No Music Playing',
-                  style: TextStyle(
-                    fontFamily: 'Comfortaa',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: DeskTheme.textPrimary,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Play audio in Amazon Music or Spotify',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Comfortaa',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: DeskTheme.textMuted,
-                  ),
-                ),
-              ],
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.08),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 0.8,
+              ),
+            ),
+            child: Icon(
+              CupertinoIcons.music_note,
+              size: 28,
+              color: Colors.white.withValues(alpha: 0.5),
             ),
           ),
+          const SizedBox(height: 12),
+          const Text(
+            'No Music Playing',
+            style: TextStyle(
+              fontFamily: 'Comfortaa',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: DeskTheme.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Play audio in Amazon Music or Spotify',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Comfortaa',
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: DeskTheme.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlSliders({required bool isExpanded}) {
+    final height = isExpanded ? 154.0 : 138.0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IosControlSlider(
+          type: IosSliderType.brightness,
+          valueListenable: widget.mediaService.brightness,
+          onChanged: (val) => widget.mediaService.setBrightness(val),
+          width: 44.0,
+          height: height,
         ),
-
-        const SizedBox(width: 16),
-
-        // Right Column: iOS Control Center Sliders (Brightness & Volume)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IosControlSlider(
-              type: IosSliderType.brightness,
-              valueListenable: widget.mediaService.brightness,
-              onChanged: (val) => widget.mediaService.setBrightness(val),
-              width: 44.0,
-              height: 134.0,
-            ),
-            const SizedBox(width: 10),
-            IosControlSlider(
-              type: IosSliderType.volume,
-              valueListenable: widget.mediaService.volumeRatio,
-              onChanged: (val) => widget.mediaService.setVolume(val),
-              width: 44.0,
-              height: 134.0,
-            ),
-          ],
+        const SizedBox(width: 10),
+        IosControlSlider(
+          type: IosSliderType.volume,
+          valueListenable: widget.mediaService.volumeRatio,
+          onChanged: (val) => widget.mediaService.setVolume(val),
+          width: 44.0,
+          height: height,
         ),
       ],
     );
