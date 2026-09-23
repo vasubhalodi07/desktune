@@ -45,6 +45,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
   bool _showControls = true;
   Timer? _inactivityTimer;
   Color? _artworkAccentColor;
+  List<Color>? _artworkColors;
   int? _lastArtworkHash;
   late final BatteryService _batteryService;
   bool _ownsBatteryService = false;
@@ -70,11 +71,12 @@ class _DeskModeScreenState extends State<DeskModeScreen>
 
   void _updateArtworkAccentColor(Uint8List? artworkBytes) {
     if (artworkBytes == null || artworkBytes.isEmpty) {
-      if (_artworkAccentColor != null) {
+      if (_artworkAccentColor != null || _artworkColors != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
               _artworkAccentColor = null;
+              _artworkColors = null;
               _lastArtworkHash = null;
             });
           }
@@ -94,6 +96,11 @@ class _DeskModeScreenState extends State<DeskModeScreen>
       if (mounted) {
         setState(() {
           _artworkAccentColor = scheme.primary;
+          _artworkColors = [
+            scheme.primary,
+            scheme.secondary,
+            scheme.tertiary,
+          ];
         });
       }
     }).catchError((_) {});
@@ -402,6 +409,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
                       borderRadius: 28,
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                       accentColor: _artworkAccentColor,
+                      paletteColors: _artworkColors,
                       child: media.hasActiveSession && media.hasContent
                           ? _buildActiveCardContent(media, false)
                           : _buildEmptyCardContent(),
@@ -499,6 +507,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
                 borderRadius: 32,
                 padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
                 accentColor: _artworkAccentColor,
+                paletteColors: _artworkColors,
                 child: media.hasActiveSession && media.hasContent
                     ? _buildActiveCardContent(media, true)
                     : _buildEmptyCardContent(),
