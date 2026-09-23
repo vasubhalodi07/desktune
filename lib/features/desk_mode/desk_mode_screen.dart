@@ -575,10 +575,11 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         ),
         const SizedBox(height: 6),
 
-        // Playback controls (iOS Cupertino icons)
+        // Playback controls (Liquid Glass controls)
         MusicControls(
           media: media,
-          size: isExpanded ? 52 : 44,
+          size: isExpanded ? 54 : 46,
+          accentColor: _artworkAccentColor,
           onPrevious: () => widget.mediaService.previous(),
           onTogglePlayPause: () => widget.mediaService.togglePlayPause(),
           onNext: () => widget.mediaService.next(),
