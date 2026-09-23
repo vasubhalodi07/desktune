@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Versioned release APKs kept locally (named after the pubspec version)
+/build_version/

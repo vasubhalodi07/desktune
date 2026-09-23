@@ -143,17 +143,18 @@ class _PermissionGateScreenState extends State<PermissionGateScreen>
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         const Text(
-          'DeskTune turns this phone into a dedicated desk clock and music controller for Amazon Music, Spotify, and other media players.\n\nTo view track information, album artwork, and provide playback controls, Android requires Notification & Media access.',
+          'A desk clock and music controller for your phone. '
+          'Allow media access to show what\'s playing and control playback.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 13,
-            height: 1.45,
+            fontSize: 14,
+            height: 1.5,
             color: DeskTheme.textSecondary,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 22),
         SizedBox(
           width: double.infinity,
           height: 48,
