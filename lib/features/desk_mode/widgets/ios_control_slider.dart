@@ -19,7 +19,7 @@ class IosControlSlider extends StatefulWidget {
     required this.valueListenable,
     required this.onChanged,
     this.width,
-    this.height = 36.0,
+    this.height = 44.0,
     this.orientation = Axis.horizontal,
   });
 
@@ -124,7 +124,7 @@ class _IosControlSliderState extends State<IosControlSlider> {
 
         final bool isFilledOverIcon;
         if (isHorizontal) {
-          isFilledOverIcon = (currentVal * totalLength) > 28.0;
+          isFilledOverIcon = (currentVal * totalLength) > 33.0;
         } else {
           isFilledOverIcon = currentVal > 0.22;
         }
@@ -205,7 +205,7 @@ class _IosControlSliderState extends State<IosControlSlider> {
                 // Icon
                 if (isHorizontal)
                   Positioned(
-                    left: 11,
+                    left: 13,
                     top: 0,
                     bottom: 0,
                     child: Center(
@@ -214,7 +214,7 @@ class _IosControlSliderState extends State<IosControlSlider> {
                         child: Icon(
                           _getIcon(currentVal),
                           key: ValueKey('${widget.type}_${currentVal > 0.02}'),
-                          size: 16,
+                          size: 18,
                           color: iconColor,
                         ),
                       ),

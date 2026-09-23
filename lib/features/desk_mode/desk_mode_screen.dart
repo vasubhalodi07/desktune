@@ -415,7 +415,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
                           : _buildEmptyCardContent(),
                     ),
                     const SizedBox(height: 12),
-                    _buildHorizontalSliders(height: 36.0),
+                    _buildHorizontalSliders(height: 44.0),
                   ],
                 ),
               ),
@@ -513,7 +513,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
                     : _buildEmptyCardContent(),
               ),
               const SizedBox(height: 14),
-              _buildHorizontalSliders(height: 38.0),
+              _buildHorizontalSliders(height: 46.0),
               const SizedBox(height: 14),
               Center(
                 child: GestureDetector(
@@ -636,7 +636,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     );
   }
 
-  Widget _buildHorizontalSliders({double height = 36.0}) {
+  Widget _buildHorizontalSliders({double height = 44.0}) {
     return Row(
       children: [
         Expanded(
