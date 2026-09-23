@@ -31,10 +31,14 @@ class ClockView extends StatelessWidget {
   Widget build(BuildContext context) {
     // Seconds are never rendered on the split music screen
     final showSeconds = isExpanded && settings.showSeconds;
-    final hoursStr = DateFormat('h').format(dateTime);
+    final hoursStr = settings.is24HourFormat
+        ? DateFormat('HH').format(dateTime)
+        : DateFormat('h').format(dateTime);
     final minutesStr = DateFormat('mm').format(dateTime);
     final secondsStr = showSeconds ? DateFormat('ss').format(dateTime) : '';
-    final amPmStr = DateFormat('a').format(dateTime).toUpperCase();
+    final amPmStr = settings.is24HourFormat
+        ? ''
+        : DateFormat('a').format(dateTime).toUpperCase();
 
     final dayShort = DateFormat('EEE').format(dateTime).toUpperCase();
     final dayNum = DateFormat('d').format(dateTime);
@@ -120,39 +124,13 @@ class ClockView extends StatelessWidget {
           // Clock Digits (Tall condensed iOS LockScreen Typography with circular colon dots)
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  hoursStr,
-                  style: TextStyle(
-                    fontFamily: clockFontFamily,
-                    fontSize: clockFontSize,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: -1.0,
-                    height: 0.95,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-                _buildColon(clockFontSize),
-                Text(
-                  minutesStr,
-                  style: TextStyle(
-                    fontFamily: clockFontFamily,
-                    fontSize: clockFontSize,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: -1.0,
-                    height: 0.95,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-                if (secondsStr.isNotEmpty) ...[
-                  _buildColon(clockFontSize),
+            child: IntrinsicHeight(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Text(
-                    secondsStr,
+                    hoursStr,
                     style: TextStyle(
                       fontFamily: clockFontFamily,
                       fontSize: clockFontSize,
@@ -163,21 +141,57 @@ class ClockView extends StatelessWidget {
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                ],
-                if (amPmStr.isNotEmpty) ...[
-                  SizedBox(width: isExpanded ? 18 : 12),
+                  _buildColon(clockFontSize),
                   Text(
-                    amPmStr,
+                    minutesStr,
                     style: TextStyle(
                       fontFamily: clockFontFamily,
-                      fontSize: isExpanded ? 34 : 20,
+                      fontSize: clockFontSize,
                       fontWeight: FontWeight.w700,
-                      color: DeskTheme.textMuted,
-                      letterSpacing: 1.5,
+                      color: Colors.white,
+                      letterSpacing: -1.0,
+                      height: 0.95,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
+                  if (secondsStr.isNotEmpty) ...[
+                    _buildColon(clockFontSize),
+                    Text(
+                      secondsStr,
+                      style: TextStyle(
+                        fontFamily: clockFontFamily,
+                        fontSize: clockFontSize,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -1.0,
+                        height: 0.95,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                  if (amPmStr.isNotEmpty) ...[
+                    SizedBox(width: isExpanded ? 16 : 10),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: isExpanded ? 18.0 : 11.0,
+                        ),
+                        child: Text(
+                          amPmStr,
+                          style: TextStyle(
+                            fontFamily: clockFontFamily,
+                            fontSize: isExpanded ? 34 : 20,
+                            fontWeight: FontWeight.w700,
+                            color: DeskTheme.textMuted,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
 
