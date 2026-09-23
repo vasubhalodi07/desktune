@@ -8,9 +8,6 @@ import android.service.notification.StatusBarNotification
 class DeskTuneNotificationListener : NotificationListenerService() {
 
     companion object {
-        var isConnected: Boolean = false
-            private set
-
         fun getComponentName(context: Context): ComponentName {
             return ComponentName(context, DeskTuneNotificationListener::class.java)
         }
@@ -18,13 +15,11 @@ class DeskTuneNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        isConnected = true
-        MediaSessionBridge.instance.onNotificationListenerConnected(this)
+        MediaSessionBridge.instance.onNotificationListenerConnected()
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
-        isConnected = false
         MediaSessionBridge.instance.onNotificationListenerDisconnected()
     }
 

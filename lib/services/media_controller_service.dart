@@ -4,15 +4,17 @@ import 'package:flutter/services.dart';
 import '../models/media_info.dart';
 
 class MediaControllerService {
-  static const MethodChannel _methodChannel =
-      MethodChannel('com.desktune.app/media');
-  static const EventChannel _mediaEvents =
-      EventChannel('com.desktune.app/media_events');
-  static const EventChannel _volumeEvents =
-      EventChannel('com.desktune.app/volume_events');
+  static const MethodChannel _methodChannel = MethodChannel(
+    'com.desktune.app/media',
+  );
+  static const EventChannel _mediaEvents = EventChannel(
+    'com.desktune.app/media_events',
+  );
+  static const EventChannel _volumeEvents = EventChannel(
+    'com.desktune.app/volume_events',
+  );
 
-  final ValueNotifier<MediaInfo> mediaInfo =
-      ValueNotifier(const MediaInfo());
+  final ValueNotifier<MediaInfo> mediaInfo = ValueNotifier(const MediaInfo());
   final ValueNotifier<double> volumeRatio = ValueNotifier(0.5);
   final ValueNotifier<double> brightness = ValueNotifier(0.7);
   final ValueNotifier<bool> isPermissionGranted = ValueNotifier(false);
@@ -21,6 +23,12 @@ class MediaControllerService {
   StreamSubscription? _volumeSub;
 
   Future<void> init() async {
+    // Cancel any existing subscriptions before re-initialising
+    await _mediaSub?.cancel();
+    await _volumeSub?.cancel();
+    _mediaSub = null;
+    _volumeSub = null;
+
     await checkPermission();
 
     try {
@@ -82,30 +90,39 @@ class MediaControllerService {
     }
   }
 
+  /// True when Android (13+) probably has notification access locked because
+  /// the app was installed from a file; the user must turn on "Allow restricted
+  /// settings" in App info first.
+  Future<bool> isRestrictedSettingsLikely() async {
+    try {
+      return await _methodChannel.invokeMethod<bool>(
+            'isRestrictedSettingsLikely',
+          ) ??
+          false;
+    } catch (e) {
+      debugPrint('Error checking restricted settings: $e');
+      return false;
+    }
+  }
+
+  Future<void> openAppInfo() async {
+    try {
+      await _methodChannel.invokeMethod('openAppInfo');
+    } catch (e) {
+      debugPrint('Error opening app info: $e');
+    }
+  }
+
   Future<void> refreshSessions() async {
     try {
-      final res = await _methodChannel.invokeMapMethod<dynamic, dynamic>('getCurrentMedia');
+      final res = await _methodChannel.invokeMapMethod<dynamic, dynamic>(
+        'getCurrentMedia',
+      );
       if (res != null) {
         mediaInfo.value = MediaInfo.fromMap(res);
       }
     } catch (e) {
       debugPrint('Error refreshing sessions: $e');
-    }
-  }
-
-  Future<void> play() async {
-    try {
-      await _methodChannel.invokeMethod('play');
-    } catch (e) {
-      debugPrint('Error invoking play: $e');
-    }
-  }
-
-  Future<void> pause() async {
-    try {
-      await _methodChannel.invokeMethod('pause');
-    } catch (e) {
-      debugPrint('Error invoking pause: $e');
     }
   }
 
@@ -183,7 +200,9 @@ class MediaControllerService {
     final clamped = ratio.clamp(0.01, 1.0);
     brightness.value = clamped;
     try {
-      await _methodChannel.invokeMethod('setBrightness', {'brightness': clamped});
+      await _methodChannel.invokeMethod('setBrightness', {
+        'brightness': clamped,
+      });
     } catch (e) {
       debugPrint('Error setting brightness: $e');
     }

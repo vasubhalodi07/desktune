@@ -87,7 +87,9 @@ class MediaInfo {
     // Android's PlaybackState.lastPositionUpdateTime is SystemClock.elapsedRealtime().
     // If lastUpdateTime is a wall-clock epoch timestamp (> 1e11), use it;
     // otherwise fallback to local receivedAtMs timestamp to prevent clamping to duration.
-    final refTime = (lastUpdateTime > 100000000000) ? lastUpdateTime : receivedAtMs;
+    final refTime = (lastUpdateTime > 100000000000)
+        ? lastUpdateTime
+        : receivedAtMs;
     if (refTime <= 0) {
       return positionMs.clamp(0, durationMs > 0 ? durationMs : positionMs);
     }
@@ -124,14 +126,14 @@ class MediaInfo {
 
   @override
   int get hashCode => Object.hash(
-        hasActiveSession,
-        packageName,
-        title,
-        artist,
-        album,
-        durationMs,
-        positionMs,
-        isPlaying,
-        artworkBytes?.length,
-      );
+    hasActiveSession,
+    packageName,
+    title,
+    artist,
+    album,
+    durationMs,
+    positionMs,
+    isPlaying,
+    artworkBytes?.length,
+  );
 }

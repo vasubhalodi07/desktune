@@ -44,7 +44,7 @@ class AppSettings {
     };
   }
 
-  factory AppSettings.fromMap(Map<String, dynamic> map) {
+  factory AppSettings.fromMap(Map<dynamic, dynamic> map) {
     return AppSettings(
       is24HourFormat: map['is24HourFormat'] as bool? ?? false,
       showSeconds: map['showSeconds'] as bool? ?? false,

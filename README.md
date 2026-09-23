@@ -1,17 +1,32 @@
-# desktune
+# DeskTune
 
-A new Flutter project.
+An Apple StandBy-style desk mode for Android: a big clock beside a liquid-glass
+now-playing card that controls Amazon Music, Spotify and any other media player.
+Includes a red night mode for dark rooms.
 
-## Getting Started
+## Build
 
-This project is a starting point for a Flutter application.
+```sh
+flutter pub get
+flutter build apk --release --target-platform android-arm64
+```
 
-A few resources to get you started if this is your first Flutter project:
+The APK is written to `build/app/outputs/flutter-apk/app-release.apk`. Release
+signing uses `android/app/release.keystore` (not committed).
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## First run: enabling media access
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+DeskTune reads track info and controls playback through Android's
+**Notification access**. If you install the APK from a file manager instead of
+the Play Store or `adb install`, Android 13+ greys the toggle out
+("Restricted setting"). The permission screen detects this and shows the fix:
+
+1. App info → ⋮ (top right) → **Allow restricted settings**
+2. Back in DeskTune, tap **Enable Media Access** and switch it on.
+
+## Layout
+
+- `lib/features/desk_mode/` – clock, music card, sliders, night mode
+- `lib/features/permission/` – permission gate and restricted-settings guide
+- `lib/services/` – Dart side of the native channels (media, battery, settings)
+- `android/app/src/main/kotlin/` – media session, volume and battery bridges

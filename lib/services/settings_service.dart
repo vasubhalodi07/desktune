@@ -13,14 +13,7 @@ class SettingsService {
       final res =
           await _channel.invokeMapMethod<dynamic, dynamic>('getSettings');
       if (res != null) {
-        settings.value = AppSettings(
-          is24HourFormat: res['is24HourFormat'] as bool? ?? false,
-          showSeconds: res['showSeconds'] as bool? ?? false,
-          showDate: res['showDate'] as bool? ?? true,
-          autoHideControls: res['autoHideControls'] as bool? ?? true,
-          autoHideDelaySeconds: res['autoHideDelaySeconds'] as int? ?? 5,
-          keepScreenAwake: res['keepScreenAwake'] as bool? ?? true,
-        );
+        settings.value = AppSettings.fromMap(res);
       }
     } catch (_) {}
   }

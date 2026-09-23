@@ -16,15 +16,39 @@ class BatteryBridge(private val context: Context) : EventChannel.StreamHandler {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     fun getBatteryData(): Map<String, Any> {
-        val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val batteryStatus: Intent? = context.registerReceiver(null, intentFilter)
-        val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-        val batteryPct = if (level >= 0 && scale > 0) (level * 100 / scale) else 100
+        val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val directCap = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
 
-        val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                status == BatteryManager.BATTERY_STATUS_FULL
+        var batteryPct = if (directCap in 0..100) directCap else -1
+        var isCharging = false
+
+        try {
+            val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            val batteryStatus: Intent? = context.registerReceiver(null, intentFilter)
+            if (batteryPct < 0 && batteryStatus != null) {
+                val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                if (level >= 0 && scale > 0) {
+                    batteryPct = (level * 100) / scale
+                }
+            }
+
+            if (batteryStatus != null) {
+                val status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                val plugged = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+                isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL ||
+                        plugged > 0
+            }
+        } catch (_: Exception) {}
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && bm != null) {
+            isCharging = isCharging || bm.isCharging
+        }
+
+        if (batteryPct < 0) {
+            batteryPct = 100
+        }
 
         return mapOf(
             "level" to batteryPct,
@@ -54,7 +78,17 @@ class BatteryBridge(private val context: Context) : EventChannel.StreamHandler {
                 addAction(Intent.ACTION_POWER_CONNECTED)
                 addAction(Intent.ACTION_POWER_DISCONNECTED)
             }
-            context.registerReceiver(batteryReceiver, filter)
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    context.registerReceiver(batteryReceiver, filter, Context.RECEIVER_EXPORTED)
+                } else {
+                    context.registerReceiver(batteryReceiver, filter)
+                }
+            } catch (_: Exception) {
+                try {
+                    context.registerReceiver(batteryReceiver, filter)
+                } catch (_: Exception) {}
+            }
         }
     }
 

@@ -1,7 +1,10 @@
 package com.desktune.desktune
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.WindowManager
@@ -19,6 +22,11 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
         private const val MEDIA_EVENTS_CHANNEL = "com.desktune.app/media_events"
         private const val VOLUME_EVENTS_CHANNEL = "com.desktune.app/volume_events"
         private const val BATTERY_EVENTS_CHANNEL = "com.desktune.app/battery_events"
+        private val FILE_INSTALLERS = setOf(
+            "com.google.android.packageinstaller",
+            "com.android.packageinstaller",
+            "com.miui.packageinstaller"
+        )
     }
 
     private var methodChannel: MethodChannel? = null
@@ -82,16 +90,25 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                     result.error("SETTINGS_ERROR", e.localizedMessage, null)
                 }
             }
+            "isRestrictedSettingsLikely" -> {
+                result.success(isRestrictedSettingsLikely())
+            }
+            "openAppInfo" -> {
+                try {
+                    val intent = Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", packageName, null)
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("APP_INFO_ERROR", e.localizedMessage, null)
+                }
+            }
             "getCurrentMedia" -> {
                 result.success(MediaSessionBridge.instance.getCurrentMediaData())
-            }
-            "play" -> {
-                MediaSessionBridge.instance.play()
-                result.success(true)
-            }
-            "pause" -> {
-                MediaSessionBridge.instance.pause()
-                result.success(true)
             }
             "togglePlayPause" -> {
                 MediaSessionBridge.instance.togglePlayPause()
@@ -142,7 +159,7 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                 result.success(true)
             }
             "getBatteryStatus" -> {
-                result.success(batteryBridge?.getBatteryData() ?: mapOf("level" to 85, "isCharging" to true))
+                result.success(batteryBridge?.getBatteryData() ?: mapOf("level" to -1, "isCharging" to false))
             }
             "setKeepScreenOn" -> {
                 val keepOn = call.argument<Boolean>("keepOn") ?: true
@@ -182,6 +199,26 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             else -> {
                 result.notImplemented()
             }
+        }
+    }
+
+    /**
+     * Android 13+ greys out Notification access ("Restricted setting") for apps installed
+     * from a file until the user allows it in App info. Apps are not permitted to read
+     * that app-op themselves (SecurityException), so infer it from the install source.
+     */
+    private fun isRestrictedSettingsLikely(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
+        return isInstalledFromFile() && !isNotificationListenerGranted()
+    }
+
+    /** True when installed through a file installer (not a store, not adb). */
+    private fun isInstalledFromFile(): Boolean {
+        return try {
+            val installer = packageManager.getInstallSourceInfo(packageName).installingPackageName
+            installer in FILE_INSTALLERS
+        } catch (_: Exception) {
+            false
         }
     }
 

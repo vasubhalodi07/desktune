@@ -1,5 +1,5 @@
 name: desktune
-description: "A new Flutter project."
+description: "DeskTune - StandBy-style desk clock and music controller for Android."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -73,6 +73,3 @@ flutter:
     - family: Comfortaa
       fonts:
         - asset: assets/fonts/Comfortaa.ttf
-    - family: Antonio
-      fonts:
-        - asset: assets/fonts/Antonio.ttf

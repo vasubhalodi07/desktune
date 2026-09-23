@@ -10,7 +10,7 @@ class LiquidGlassCard extends StatefulWidget {
   final VoidCallback? onTap;
   final Color? accentColor;
   final List<Color>? paletteColors;
-  final bool isPlaying;
+  final bool showShadow;
 
   const LiquidGlassCard({
     super.key,
@@ -21,7 +21,7 @@ class LiquidGlassCard extends StatefulWidget {
     this.onTap,
     this.accentColor,
     this.paletteColors,
-    this.isPlaying = true,
+    this.showShadow = true,
   });
 
   @override
@@ -37,7 +37,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 9),
+      duration: const Duration(seconds: 14),
     )..repeat();
   }
 
@@ -50,15 +50,25 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
   List<Color> _resolveColors() {
     if (widget.paletteColors != null && widget.paletteColors!.isNotEmpty) {
       final p = widget.paletteColors!;
-      final c1 = p[0];
-      final c2 = p.length > 1 ? p[1] : _shiftHue(c1, 38);
-      final c3 = p.length > 2 ? p[2] : _shiftHue(c1, -38);
+      final c1 = _toneColor(p[0]);
+      final c2 = p.length > 1 ? _toneColor(p[1]) : _shiftHue(c1, 38);
+      final c3 = p.length > 2 ? _toneColor(p[2]) : _shiftHue(c1, -38);
       return [c1, c2, c3];
     } else if (widget.accentColor != null) {
-      final c1 = widget.accentColor!;
+      final c1 = _toneColor(widget.accentColor!);
       return [c1, _shiftHue(c1, 36), _shiftHue(c1, -36)];
     }
     return [];
+  }
+
+  /// Mutes a raw palette color so vivid artwork doesn't overpower the UI.
+  /// Caps saturation at 55% and lightness at 35% for a consistent moody feel.
+  Color _toneColor(Color c) {
+    final hsl = HSLColor.fromColor(c);
+    return hsl
+        .withSaturation(hsl.saturation.clamp(0.0, 0.55))
+        .withLightness(hsl.lightness.clamp(0.08, 0.35))
+        .toColor();
   }
 
   Color _shiftHue(Color c, double degrees) {
@@ -102,7 +112,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
 
               // Frosted Glass Layer
               BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                 child: Container(
                   padding: widget.padding ?? const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -118,18 +128,12 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
                       ),
                       colors: [
                         hasColors
-                            ? primaryColor.withValues(alpha: 0.22)
-                            : Colors.white.withValues(alpha: 0.12),
+                            ? primaryColor.withValues(alpha: 0.13)
+                            : Colors.white.withValues(alpha: 0.10),
                         hasColors
-                            ? secondaryColor.withValues(alpha: 0.14)
-                            : Colors.white.withValues(alpha: 0.04),
+                            ? secondaryColor.withValues(alpha: 0.07)
+                            : Colors.white.withValues(alpha: 0.03),
                       ],
-                    ),
-                    border: Border.all(
-                      color: hasColors
-                          ? primaryColor.withValues(alpha: 0.36)
-                          : Colors.white.withValues(alpha: 0.16),
-                      width: 1.0,
                     ),
                   ),
                   child: widget.child,
@@ -143,7 +147,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
           alignment: Alignment.center,
           children: [
             // Multi-Color Traveling Ambient Diffused Glow (Behind the Card)
-            if (hasColors)
+            if (hasColors && widget.showShadow)
               Positioned.fill(
                 child: Container(
                   margin: const EdgeInsets.all(4),
@@ -172,24 +176,25 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
               ),
 
             // Deep black ambient drop shadow for elevation
-            Positioned.fill(
-              child: Container(
-                margin: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(widget.borderRadius),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.42),
-                      blurRadius: 22,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+            if (widget.showShadow)
+              Positioned.fill(
+                child: Container(
+                  margin: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        blurRadius: 22,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
             // Glass Body
-            glassBody,
+            RepaintBoundary(child: glassBody),
           ],
         );
 
@@ -198,10 +203,7 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
         }
 
         if (widget.onTap != null) {
-          return GestureDetector(
-            onTap: widget.onTap,
-            child: content,
-          );
+          return GestureDetector(onTap: widget.onTap, child: content);
         }
 
         return content;
@@ -250,26 +252,17 @@ class _LiquidMeshPainter extends CustomPainter {
 
     final paint1 = Paint()
       ..shader = RadialGradient(
-        colors: [
-          color1.withValues(alpha: 0.44),
-          color1.withValues(alpha: 0.0),
-        ],
+        colors: [color1.withValues(alpha: 0.26), color1.withValues(alpha: 0.0)],
       ).createShader(Rect.fromCircle(center: c1, radius: r1));
 
     final paint2 = Paint()
       ..shader = RadialGradient(
-        colors: [
-          color2.withValues(alpha: 0.38),
-          color2.withValues(alpha: 0.0),
-        ],
+        colors: [color2.withValues(alpha: 0.20), color2.withValues(alpha: 0.0)],
       ).createShader(Rect.fromCircle(center: c2, radius: r2));
 
     final paint3 = Paint()
       ..shader = RadialGradient(
-        colors: [
-          color3.withValues(alpha: 0.30),
-          color3.withValues(alpha: 0.0),
-        ],
+        colors: [color3.withValues(alpha: 0.15), color3.withValues(alpha: 0.0)],
       ).createShader(Rect.fromCircle(center: c3, radius: r3));
 
     canvas.drawCircle(c1, r1, paint1);

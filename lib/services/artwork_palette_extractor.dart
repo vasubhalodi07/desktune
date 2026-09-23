@@ -26,7 +26,9 @@ class ArtworkPalette {
 }
 
 class ArtworkPaletteExtractor {
+  // Bounded cache: evicts the oldest inserted entry beyond 12 to cap memory
   static final Map<int, ArtworkPalette> _cache = {};
+  static const int _maxCacheSize = 12;
 
   /// Dynamically extracts dominant, vibrant colors directly from the raw image pixels
   /// like Netflix and Apple Music do, avoiding generic/fixed Material 3 tonal shifts.
@@ -53,7 +55,9 @@ class ArtworkPaletteExtractor {
       );
       final frame = await codec.getNextFrame();
       final image = frame.image;
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final byteData = await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
       image.dispose();
       codec.dispose();
 
@@ -103,7 +107,7 @@ class ArtworkPaletteExtractor {
           tertiary: _boostSaturation(c3),
           allColors: [c1, c2, c3],
         );
-        _cache[hash] = palette;
+        _cacheSet(hash, palette);
         return palette;
       }
 
@@ -148,11 +152,18 @@ class ArtworkPaletteExtractor {
         allColors: [primary, secondary, tertiary],
       );
 
-      _cache[hash] = palette;
+      _cacheSet(hash, palette);
       return palette;
     } catch (_) {
       return ArtworkPalette.fallback;
     }
+  }
+
+  static void _cacheSet(int key, ArtworkPalette value) {
+    if (_cache.length >= _maxCacheSize) {
+      _cache.remove(_cache.keys.first);
+    }
+    _cache[key] = value;
   }
 
   static Color _boostSaturation(Color c) {
@@ -166,13 +177,22 @@ class ArtworkPaletteExtractor {
   static Color _shiftHue(Color c, double degrees) {
     final hsl = HSLColor.fromColor(c);
     final newHue = (hsl.hue + degrees + 360.0) % 360.0;
-    return hsl.withHue(newHue).withSaturation(0.75).withLightness(0.50).toColor();
+    return hsl
+        .withHue(newHue)
+        .withSaturation(0.75)
+        .withLightness(0.50)
+        .toColor();
   }
 
   static Color _samplePixel(Uint8List pixels, int x, int y) {
     final offset = (y * 28 + x) * 4;
     if (offset + 2 < pixels.length) {
-      return Color.fromARGB(255, pixels[offset], pixels[offset + 1], pixels[offset + 2]);
+      return Color.fromARGB(
+        255,
+        pixels[offset],
+        pixels[offset + 1],
+        pixels[offset + 2],
+      );
     }
     return const Color(0xFF6C5CE7);
   }

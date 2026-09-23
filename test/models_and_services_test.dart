@@ -79,20 +79,28 @@ void main() {
         is24HourFormat: true,
         showSeconds: true,
         autoHideDelaySeconds: 10,
+        keepScreenAwake: false,
       );
 
       expect(updated.is24HourFormat, true);
       expect(updated.showSeconds, true);
       expect(updated.autoHideDelaySeconds, 10);
       expect(updated.showDate, true); // preserved
+      expect(updated.keepScreenAwake, false);
+
+      final map = updated.toMap();
+      final fromMap = AppSettings.fromMap(map);
+      expect(fromMap.is24HourFormat, true);
+      expect(fromMap.autoHideDelaySeconds, 10);
+      expect(fromMap.keepScreenAwake, false);
     });
   });
 
   group('BatteryInfo tests', () {
-    test('Defaults to 85% and charging true', () {
+    test('Defaults to unknown level and not charging', () {
       const info = BatteryInfo();
-      expect(info.level, 85);
-      expect(info.isCharging, true);
+      expect(info.level, -1);
+      expect(info.isCharging, false);
     });
 
     test('Parses from native battery data map', () {

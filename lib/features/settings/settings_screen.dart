@@ -54,16 +54,18 @@ class SettingsScreen extends StatelessWidget {
                   icon: CupertinoIcons.stopwatch,
                   title: 'Show Seconds',
                   value: settings.showSeconds,
-                  onChanged: (val) => settingsService
-                      .updateSettings(settings.copyWith(showSeconds: val)),
+                  onChanged: (val) => settingsService.updateSettings(
+                    settings.copyWith(showSeconds: val),
+                  ),
                   showDivider: true,
                 ),
                 _buildCupertinoRow(
                   icon: CupertinoIcons.calendar,
                   title: 'Show Date',
                   value: settings.showDate,
-                  onChanged: (val) => settingsService
-                      .updateSettings(settings.copyWith(showDate: val)),
+                  onChanged: (val) => settingsService.updateSettings(
+                    settings.copyWith(showDate: val),
+                  ),
                   showDivider: false,
                 ),
               ]),
@@ -76,7 +78,9 @@ class SettingsScreen extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     child: Row(
                       children: [
                         Container(
@@ -159,10 +163,7 @@ class SettingsScreen extends StatelessWidget {
           width: 0.8,
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: children,
-      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
     );
   }
 

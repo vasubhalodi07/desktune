@@ -291,7 +291,8 @@ class ClockView extends StatelessWidget {
 
   Widget _buildBatteryStatus(BatteryInfo info, String fontFamily) {
     final isCharging = info.isCharging;
-    final isLow = info.level <= 20;
+    final hasData = info.level >= 0;
+    final isLow = hasData && info.level <= 20;
     final Color textColor = isCharging
         ? const Color(0xFF34C759)
         : (isLow ? const Color(0xFFFF453A) : DeskTheme.textSecondary);
@@ -309,7 +310,7 @@ class ClockView extends StatelessWidget {
           const SizedBox(width: 3),
         ],
         Text(
-          '${info.level}%',
+          hasData ? '${info.level}%' : '--',
           style: TextStyle(
             fontFamily: fontFamily,
             fontSize: 14,

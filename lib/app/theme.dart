@@ -6,10 +6,9 @@ class DeskTheme {
   static const Color background = Color(0xFF000000);
 
   // Liquid Frosted Glass Colors
-  static const Color glassSurface = Color(0x1AFFFFFF); // 10% white
-  static const Color glassSurfaceLight = Color(0x28FFFFFF); // 16% white
-  static const Color surfaceElevated = Color(0x24FFFFFF); // 14% white for elevated elements
-  static const Color glassBorder = Color(0x2EFFFFFF); // 18% white specular edge
+  static const Color surfaceElevated = Color(
+    0x24FFFFFF,
+  ); // 14% white for elevated elements
   static const Color glassCard = Color(0x14FFFFFF); // 8% white
 
   static const Color textPrimary = Color(0xFFFFFFFF);
@@ -18,6 +17,7 @@ class DeskTheme {
 
   static const Color accent = Color(0xFFFFFFFF);
   static const Color accentRed = Color(0xFFFF453A); // Apple system red
+  static const Color warning = Color(0xFFFF9F0A); // Apple system orange
   static const Color sliderTrack = Color(0x33FFFFFF); // 20% white
   static const Color sliderActive = Color(0xFFFFFFFF);
 

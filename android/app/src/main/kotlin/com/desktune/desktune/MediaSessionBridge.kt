@@ -55,7 +55,7 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
         refreshSessions()
     }
 
-    fun onNotificationListenerConnected(listener: DeskTuneNotificationListener) {
+    fun onNotificationListenerConnected() {
         refreshSessions()
     }
 
@@ -260,20 +260,12 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
     }
 
     // Transport controls
-    fun play() {
-        activeController?.transportControls?.play()
-    }
-
-    fun pause() {
-        activeController?.transportControls?.pause()
-    }
-
     fun togglePlayPause() {
-        val state = activeController?.playbackState?.state
-        if (state == PlaybackState.STATE_PLAYING) {
-            pause()
+        val controls = activeController?.transportControls ?: return
+        if (activeController?.playbackState?.state == PlaybackState.STATE_PLAYING) {
+            controls.pause()
         } else {
-            play()
+            controls.play()
         }
     }
 

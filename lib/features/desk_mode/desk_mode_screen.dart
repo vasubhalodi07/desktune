@@ -95,14 +95,16 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     if (hash == _lastArtworkHash) return;
     _lastArtworkHash = hash;
 
-    ArtworkPaletteExtractor.extract(artworkBytes).then((palette) {
-      if (mounted) {
-        setState(() {
-          _artworkAccentColor = palette.primary;
-          _artworkColors = palette.allColors;
-        });
-      }
-    }).catchError((_) {});
+    ArtworkPaletteExtractor.extract(artworkBytes)
+        .then((palette) {
+          if (mounted) {
+            setState(() {
+              _artworkAccentColor = palette.primary;
+              _artworkColors = palette.allColors;
+            });
+          }
+        })
+        .catchError((_) {});
   }
 
   @override
@@ -122,12 +124,6 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     widget.mediaService.mediaInfo.addListener(_onMediaInfoChanged);
     _updateArtworkAccentColor(widget.mediaService.mediaInfo.value.artworkBytes);
 
-    // Lock to landscape for Desk StandBy mode
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-
     // Immersive sticky full screen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
@@ -145,6 +141,10 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     if (state == AppLifecycleState.resumed) {
       widget.mediaService.refreshSessions();
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      // Retry a couple more times to handle slow listener reconnections on MIUI
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) widget.mediaService.refreshSessions();
+      });
     }
   }
 
@@ -186,7 +186,6 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     widget.mediaService.mediaInfo.removeListener(_onMediaInfoChanged);
     WidgetsBinding.instance.removeObserver(this);
     _inactivityTimer?.cancel();
-    SystemChrome.setPreferredOrientations([]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -201,117 +200,37 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         onPointerMove: (_) => _onUserInteraction(),
         child: Stack(
           children: [
-            // Main StandBy Stage
+            // Main StandBy Stage — the per-second clock tick is isolated to the innermost builder
             SafeArea(
               child: ValueListenableBuilder<AppSettings>(
                 valueListenable: widget.settingsService.settings,
                 builder: (context, settings, _) {
-                  return ValueListenableBuilder<DateTime>(
-                    valueListenable: widget.clockService.currentTime,
-                    builder: (context, dateTime, _) {
-                      return ValueListenableBuilder<MediaInfo>(
-                        valueListenable: widget.mediaService.mediaInfo,
-                        builder: (context, media, _) {
-                          return ValueListenableBuilder<BatteryInfo>(
-                            valueListenable: _batteryService.batteryInfo,
-                            builder: (context, batteryInfo, _) {
+                  return ValueListenableBuilder<MediaInfo>(
+                    valueListenable: widget.mediaService.mediaInfo,
+                    builder: (context, media, _) {
+                      return ValueListenableBuilder<BatteryInfo>(
+                        valueListenable: _batteryService.batteryInfo,
+                        builder: (context, batteryInfo, _) {
+                          return ValueListenableBuilder<DateTime>(
+                            valueListenable: widget.clockService.currentTime,
+                            builder: (context, dateTime, _) {
                               return AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 380),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            layoutBuilder: (currentChild, previousChildren) {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: <Widget>[
-                                  ...previousChildren,
-                                  ?currentChild,
-                                ],
+                                duration: const Duration(milliseconds: 380),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                layoutBuilder: _viewLayoutBuilder,
+                                transitionBuilder: _viewTransitionBuilder,
+                                child: _buildCurrentView(
+                                  dateTime: dateTime,
+                                  settings: settings,
+                                  media: media,
+                                  batteryInfo: batteryInfo,
+                                ),
                               );
                             },
-                            transitionBuilder: (child, animation) {
-                              final isIncoming = child.key == ValueKey(_viewMode);
-
-                              if (isIncoming) {
-                                final curved = CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOutCubic,
-                                );
-
-                                final fadeAnim = CurvedAnimation(
-                                  parent: animation,
-                                  curve: const Interval(0.22, 1.0, curve: Curves.easeOut),
-                                );
-
-                                Offset startOffset = Offset.zero;
-                                if (_viewMode == DeskViewMode.fullClock) {
-                                  // Entering full clock from split: subtle slide in from left
-                                  startOffset = const Offset(-0.04, 0.0);
-                                } else if (_viewMode == DeskViewMode.fullMusic) {
-                                  // Entering full music from split: subtle slide in from right
-                                  startOffset = const Offset(0.04, 0.0);
-                                } else if (_previousViewMode == DeskViewMode.fullClock) {
-                                  // Returning to split from full clock: subtle slide in from right
-                                  startOffset = const Offset(0.04, 0.0);
-                                } else if (_previousViewMode == DeskViewMode.fullMusic) {
-                                  // Returning to split from full music: subtle slide in from left
-                                  startOffset = const Offset(-0.04, 0.0);
-                                }
-
-                                final slideAnim = Tween<Offset>(
-                                  begin: startOffset,
-                                  end: Offset.zero,
-                                ).animate(curved);
-
-                                final scaleAnim = Tween<double>(
-                                  begin: 0.94,
-                                  end: 1.0,
-                                ).animate(curved);
-
-                                return FadeTransition(
-                                  opacity: fadeAnim,
-                                  child: SlideTransition(
-                                    position: slideAnim,
-                                    child: ScaleTransition(
-                                      scale: scaleAnim,
-                                      child: child,
-                                    ),
-                                  ),
-                                );
-                              } else {
-                                // Outgoing child: cleanly dissolves within first 35% to prevent double-clock ghosting
-                                final fadeAnim = CurvedAnimation(
-                                  parent: animation,
-                                  curve: const Interval(0.65, 1.0, curve: Curves.easeIn),
-                                );
-
-                                final scaleAnim = Tween<double>(
-                                  begin: 0.96,
-                                  end: 1.0,
-                                ).animate(CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeInCubic,
-                                ));
-
-                                return FadeTransition(
-                                  opacity: fadeAnim,
-                                  child: ScaleTransition(
-                                    scale: scaleAnim,
-                                    child: child,
-                                  ),
-                                );
-                              }
-                            },
-                            child: _buildCurrentView(
-                              dateTime: dateTime,
-                              settings: settings,
-                              media: media,
-                              batteryInfo: batteryInfo,
-                            ),
                           );
                         },
                       );
-                    },
-                  );
                     },
                   );
                 },
@@ -350,6 +269,71 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     );
   }
 
+  Widget _viewLayoutBuilder(
+    Widget? currentChild,
+    List<Widget> previousChildren,
+  ) {
+    return Stack(
+      alignment: Alignment.center,
+      children: <Widget>[...previousChildren, ?currentChild],
+    );
+  }
+
+  /// Direction the incoming view slides in from when switching view modes.
+  Offset _incomingSlideOffset() {
+    if (_viewMode == DeskViewMode.fullClock) return const Offset(-0.04, 0.0);
+    if (_viewMode == DeskViewMode.fullMusic) return const Offset(0.04, 0.0);
+    if (_previousViewMode == DeskViewMode.fullClock) {
+      return const Offset(0.04, 0.0);
+    }
+    if (_previousViewMode == DeskViewMode.fullMusic) {
+      return const Offset(-0.04, 0.0);
+    }
+    return Offset.zero;
+  }
+
+  Widget _viewTransitionBuilder(Widget child, Animation<double> animation) {
+    final isIncoming = child.key == ValueKey(_viewMode);
+
+    if (isIncoming) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+
+      return FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0.22, 1.0, curve: Curves.easeOut),
+        ),
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: _incomingSlideOffset(),
+            end: Offset.zero,
+          ).animate(curved),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
+            child: child,
+          ),
+        ),
+      );
+    }
+
+    // Outgoing child dissolves within the first 35% to prevent double-clock ghosting
+    return FadeTransition(
+      opacity: CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0.65, 1.0, curve: Curves.easeIn),
+      ),
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.96, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeInCubic),
+        ),
+        child: child,
+      ),
+    );
+  }
+
   Widget _buildCurrentView({
     required DateTime dateTime,
     required AppSettings settings,
@@ -373,6 +357,8 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     MediaInfo media,
     BatteryInfo batteryInfo,
   ) {
+    final hasMusic = media.hasActiveSession && media.hasContent;
+
     return Row(
       key: const ValueKey(DeskViewMode.dual),
       children: [
@@ -394,28 +380,34 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         // Right Half: Liquid Glass Music Card + Horizontal Sliders Below
         Expanded(
           flex: 6,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 20, top: 12, bottom: 12),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    LiquidGlassCard(
-                      borderRadius: 28,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      accentColor: _artworkAccentColor,
-                      paletteColors: _artworkColors,
-                      child: media.hasActiveSession && media.hasContent
-                          ? _buildActiveCardContent(media, false)
-                          : _buildEmptyCardContent(),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildHorizontalSliders(height: 44.0),
-                  ],
+          child: RepaintBoundary(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 20, top: 12, bottom: 12),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      LiquidGlassCard(
+                        borderRadius: 28,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 12,
+                        ),
+                        accentColor: _artworkAccentColor,
+                        paletteColors: _artworkColors,
+                        showShadow: hasMusic,
+                        child: hasMusic
+                            ? _buildActiveCardContent(media, false)
+                            : _buildEmptyCardContent(),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildHorizontalSliders(height: 44.0),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -443,7 +435,11 @@ class _DeskModeScreenState extends State<DeskModeScreen>
   }
 
   // 2. Full Clock Mode (Edge-to-edge Apple StandBy giant digits centered perfectly)
-  Widget _buildFullClockView(DateTime dateTime, AppSettings settings, BatteryInfo batteryInfo) {
+  Widget _buildFullClockView(
+    DateTime dateTime,
+    AppSettings settings,
+    BatteryInfo batteryInfo,
+  ) {
     return SizedBox.expand(
       key: const ValueKey(DeskViewMode.fullClock),
       child: Stack(
@@ -492,6 +488,8 @@ class _DeskModeScreenState extends State<DeskModeScreen>
 
   // 3. Full Music Mode (Expanded iOS Now Playing Stage)
   Widget _buildFullMusicView(MediaInfo media) {
+    final hasMusic = media.hasActiveSession && media.hasContent;
+
     return Center(
       key: const ValueKey(DeskViewMode.fullMusic),
       child: ConstrainedBox(
@@ -504,10 +502,14 @@ class _DeskModeScreenState extends State<DeskModeScreen>
             children: [
               LiquidGlassCard(
                 borderRadius: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 26,
+                  vertical: 16,
+                ),
                 accentColor: _artworkAccentColor,
                 paletteColors: _artworkColors,
-                child: media.hasActiveSession && media.hasContent
+                showShadow: hasMusic,
+                child: hasMusic
                     ? _buildActiveCardContent(media, true)
                     : _buildEmptyCardContent(),
               ),
@@ -547,10 +549,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            MusicArtwork(
-              artworkBytes: media.artworkBytes,
-              size: artworkSize,
-            ),
+            MusicArtwork(artworkBytes: media.artworkBytes, size: artworkSize),
             const SizedBox(width: 12),
             Expanded(
               child: MusicInfo(
@@ -578,7 +577,6 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         MusicControls(
           media: media,
           size: isExpanded ? 54 : 46,
-          accentColor: _artworkAccentColor,
           onPrevious: () => widget.mediaService.previous(),
           onTogglePlayPause: () => widget.mediaService.togglePlayPause(),
           onNext: () => widget.mediaService.next(),
