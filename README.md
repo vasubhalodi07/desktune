@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/split-view.png" alt="DeskTune split view in landscape: a large clock on the left, a now-playing card with playback controls and brightness and volume sliders on the right" width="900"><br>
+  <img src="docs/screenshots/split-view.png" alt="DeskTune split view in landscape: a large clock on the left, and on the right a now-playing card with playback controls, the player's glass app icon, and brightness and volume sliders" width="900"><br>
   <sub>Split view: the clock on the left, what's playing on the right.</sub>
 </p>
 

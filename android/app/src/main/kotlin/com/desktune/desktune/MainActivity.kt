@@ -66,6 +66,13 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
         val savedBrightness = prefs.getFloat("desk_brightness", 0.7f)
         val layoutParams = window.attributes
         layoutParams.screenBrightness = savedBrightness.coerceIn(0.01f, 1.0f)
+        // By default Android shrinks the window to avoid a camera cut-out, which
+        // leaves it off-centre on the screen. Draw under the cut-out instead; the
+        // Flutter layout then applies the cut-out inset equally on both sides.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            layoutParams.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
         window.attributes = layoutParams
     }
 
