@@ -64,6 +64,15 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         _inactivityTimer?.cancel();
       }
     });
+    _syncClockResolution();
+  }
+
+  /// Seconds only appear on the full-screen clock, so that is the only time the
+  /// clock needs to tick every second; otherwise it ticks once a minute.
+  void _syncClockResolution() {
+    widget.clockService.showSeconds =
+        _viewMode == DeskViewMode.fullClock &&
+        widget.settingsService.settings.value.showSeconds;
   }
 
   void _onMediaInfoChanged() {
@@ -132,20 +141,45 @@ class _DeskModeScreenState extends State<DeskModeScreen>
       widget.settingsService.settings.value.keepScreenAwake,
     );
 
+    widget.settingsService.settings.addListener(_syncClockResolution);
+    _syncClockResolution();
     widget.clockService.start();
     _resetInactivityTimer();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      widget.mediaService.refreshSessions();
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-      // Retry a couple more times to handle slow listener reconnections on MIUI
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) widget.mediaService.refreshSessions();
-      });
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _resumeBackgroundWork();
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        _pauseBackgroundWork();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        break;
     }
+  }
+
+  /// Screen off or another app in front: stop the clock and the native event
+  /// streams so nothing wakes the CPU for a UI nobody can see.
+  void _pauseBackgroundWork() {
+    _inactivityTimer?.cancel();
+    widget.clockService.stop();
+    widget.mediaService.pause();
+    _batteryService.pause();
+  }
+
+  void _resumeBackgroundWork() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    widget.clockService.start();
+    widget.mediaService.resume();
+    _batteryService.init();
+    _resetInactivityTimer();
+    // Retry once more to handle slow listener reconnections on MIUI
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) widget.mediaService.refreshSessions();
+    });
   }
 
   void _resetInactivityTimer() {
@@ -184,7 +218,9 @@ class _DeskModeScreenState extends State<DeskModeScreen>
       _batteryService.dispose();
     }
     widget.mediaService.mediaInfo.removeListener(_onMediaInfoChanged);
+    widget.settingsService.settings.removeListener(_syncClockResolution);
     WidgetsBinding.instance.removeObserver(this);
+    widget.clockService.stop();
     _inactivityTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -200,7 +236,8 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         onPointerMove: (_) => _onUserInteraction(),
         child: Stack(
           children: [
-            // Main StandBy Stage — the per-second clock tick is isolated to the innermost builder
+            // Main StandBy Stage. The clock ticks inside ClockView only, so a tick
+            // never rebuilds the music card or sliders.
             SafeArea(
               child: ValueListenableBuilder<AppSettings>(
                 valueListenable: widget.settingsService.settings,
@@ -211,23 +248,17 @@ class _DeskModeScreenState extends State<DeskModeScreen>
                       return ValueListenableBuilder<BatteryInfo>(
                         valueListenable: _batteryService.batteryInfo,
                         builder: (context, batteryInfo, _) {
-                          return ValueListenableBuilder<DateTime>(
-                            valueListenable: widget.clockService.currentTime,
-                            builder: (context, dateTime, _) {
-                              return AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 380),
-                                switchInCurve: Curves.easeOutCubic,
-                                switchOutCurve: Curves.easeInCubic,
-                                layoutBuilder: _viewLayoutBuilder,
-                                transitionBuilder: _viewTransitionBuilder,
-                                child: _buildCurrentView(
-                                  dateTime: dateTime,
-                                  settings: settings,
-                                  media: media,
-                                  batteryInfo: batteryInfo,
-                                ),
-                              );
-                            },
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 380),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            layoutBuilder: _viewLayoutBuilder,
+                            transitionBuilder: _viewTransitionBuilder,
+                            child: _buildCurrentView(
+                              settings: settings,
+                              media: media,
+                              batteryInfo: batteryInfo,
+                            ),
                           );
                         },
                       );
@@ -335,24 +366,22 @@ class _DeskModeScreenState extends State<DeskModeScreen>
   }
 
   Widget _buildCurrentView({
-    required DateTime dateTime,
     required AppSettings settings,
     required MediaInfo media,
     required BatteryInfo batteryInfo,
   }) {
     switch (_viewMode) {
       case DeskViewMode.fullClock:
-        return _buildFullClockView(dateTime, settings, batteryInfo);
+        return _buildFullClockView(settings, batteryInfo);
       case DeskViewMode.fullMusic:
         return _buildFullMusicView(media);
       case DeskViewMode.dual:
-        return _buildDualStandByView(dateTime, settings, media, batteryInfo);
+        return _buildDualStandByView(settings, media, batteryInfo);
     }
   }
 
   // 1. Dual StandBy View: 50% Clock + 50% Liquid Glass Music Card
   Widget _buildDualStandByView(
-    DateTime dateTime,
     AppSettings settings,
     MediaInfo media,
     BatteryInfo batteryInfo,
@@ -367,7 +396,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
           flex: 5,
           child: Center(
             child: ClockView(
-              dateTime: dateTime,
+              time: widget.clockService.currentTime,
               settings: settings,
               batteryInfo: batteryInfo,
               isExpanded: false,
@@ -400,6 +429,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
                         accentColor: _artworkAccentColor,
                         paletteColors: _artworkColors,
                         showShadow: hasMusic,
+                        animate: media.isPlaying,
                         child: hasMusic
                             ? _buildActiveCardContent(media, false)
                             : _buildEmptyCardContent(),
@@ -435,11 +465,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
   }
 
   // 2. Full Clock Mode (Edge-to-edge Apple StandBy giant digits centered perfectly)
-  Widget _buildFullClockView(
-    DateTime dateTime,
-    AppSettings settings,
-    BatteryInfo batteryInfo,
-  ) {
+  Widget _buildFullClockView(AppSettings settings, BatteryInfo batteryInfo) {
     return SizedBox.expand(
       key: const ValueKey(DeskViewMode.fullClock),
       child: Stack(
@@ -449,7 +475,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               child: ClockView(
-                dateTime: dateTime,
+                time: widget.clockService.currentTime,
                 settings: settings,
                 batteryInfo: batteryInfo,
                 isExpanded: true,
@@ -509,6 +535,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
                 accentColor: _artworkAccentColor,
                 paletteColors: _artworkColors,
                 showShadow: hasMusic,
+                animate: media.isPlaying,
                 child: hasMusic
                     ? _buildActiveCardContent(media, true)
                     : _buildEmptyCardContent(),

@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../models/media_info.dart';
@@ -113,41 +112,35 @@ class _LiquidGlassIconButtonState extends State<_LiquidGlassIconButton> {
         scale: _isPressed ? 0.91 : 1.0,
         duration: const Duration(milliseconds: 140),
         curve: Curves.easeOutCubic,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(widget.size / 2),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: widget.size,
-              height: widget.size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: _isPressed ? 0.22 : 0.13),
-                    Colors.white.withValues(alpha: _isPressed ? 0.10 : 0.05),
-                  ],
-                ),
-                border: Border.all(
-                  color: Colors.white.withValues(
-                    alpha: _isPressed ? 0.35 : 0.20,
-                  ),
-                  width: 0.8,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Center(child: widget.icon),
+        // Plain translucent fill: no backdrop blur, which forced an offscreen
+        // pass over a black background where it was invisible.
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: _isPressed ? 0.22 : 0.13),
+                Colors.white.withValues(alpha: _isPressed ? 0.10 : 0.05),
+              ],
             ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: _isPressed ? 0.35 : 0.20),
+              width: 0.8,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
+          child: Center(child: widget.icon),
         ),
       ),
     );

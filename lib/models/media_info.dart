@@ -41,17 +41,21 @@ class MediaInfo {
     this.artworkBytes,
   });
 
-  factory MediaInfo.fromMap(Map<dynamic, dynamic>? map) {
+  /// [artwork], when given, is used instead of the bytes in [map]. The media
+  /// service passes the previously received instance when the artwork hasn't
+  /// changed, so the image isn't re-decoded on every playback event.
+  factory MediaInfo.fromMap(Map<dynamic, dynamic>? map, {Uint8List? artwork}) {
     if (map == null || map.isEmpty || map['hasActiveSession'] != true) {
       return const MediaInfo();
     }
 
-    Uint8List? artwork;
-    final rawArt = map['artwork'];
-    if (rawArt is Uint8List) {
-      artwork = rawArt;
-    } else if (rawArt is List<dynamic>) {
-      artwork = Uint8List.fromList(rawArt.cast<int>());
+    if (artwork == null) {
+      final rawArt = map['artwork'];
+      if (rawArt is Uint8List) {
+        artwork = rawArt;
+      } else if (rawArt is List<dynamic>) {
+        artwork = Uint8List.fromList(rawArt.cast<int>());
+      }
     }
 
     final localNow = DateTime.now().millisecondsSinceEpoch;

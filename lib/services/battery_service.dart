@@ -14,6 +14,18 @@ class BatteryInfo {
       isCharging: map['isCharging'] as bool? ?? false,
     );
   }
+
+  // Value equality lets the ValueNotifier drop repeat updates, so the screen
+  // only rebuilds when the level or charging state actually changes.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BatteryInfo &&
+          level == other.level &&
+          isCharging == other.isCharging;
+
+  @override
+  int get hashCode => Object.hash(level, isCharging);
 }
 
 class BatteryService {
@@ -29,6 +41,8 @@ class BatteryService {
   );
   StreamSubscription? _sub;
 
+  /// Reads the current level and starts listening for changes. Safe to call
+  /// again; it replaces any existing subscription.
   Future<void> init() async {
     try {
       final res = await _methodChannel.invokeMapMethod<dynamic, dynamic>(
@@ -39,6 +53,7 @@ class BatteryService {
       }
     } catch (_) {}
 
+    await _sub?.cancel();
     try {
       _sub = _batteryEvents.receiveBroadcastStream().listen((dynamic event) {
         if (event is Map) {
@@ -46,6 +61,13 @@ class BatteryService {
         }
       }, onError: (_) {});
     } catch (_) {}
+  }
+
+  /// Stops listening (and unregisters the native receiver) while the app is in
+  /// the background. Call [init] to resume.
+  Future<void> pause() async {
+    await _sub?.cancel();
+    _sub = null;
   }
 
   void dispose() {

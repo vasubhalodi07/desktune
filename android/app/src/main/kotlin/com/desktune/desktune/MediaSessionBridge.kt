@@ -29,6 +29,13 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
     private var cachedArtworkBytes: ByteArray? = null
     private var cachedArtworkKey: String? = null
 
+    // Artwork key last delivered to the Dart side. The (large) artwork bytes are
+    // only attached to an update when this differs from the current key.
+    private var lastEmittedArtworkKey: String? = null
+
+    // The sessions-changed listener only needs registering once per connection.
+    private var sessionsListenerRegistered = false
+
     private val sessionsChangedListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
             updateActiveController(controllers)
@@ -60,6 +67,7 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
     }
 
     fun onNotificationListenerDisconnected() {
+        sessionsListenerRegistered = false
         activeController?.unregisterCallback(controllerCallback)
         activeController = null
         emitCurrentMedia()
@@ -74,13 +82,13 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
             val controllers = mgr.getActiveSessions(componentName)
             updateActiveController(controllers)
 
-            // Re-register session changed listener safely
-            try {
-                mgr.removeOnActiveSessionsChangedListener(sessionsChangedListener)
-            } catch (_: Exception) {}
-            mgr.addOnActiveSessionsChangedListener(sessionsChangedListener, componentName)
+            if (!sessionsListenerRegistered) {
+                mgr.addOnActiveSessionsChangedListener(sessionsChangedListener, componentName)
+                sessionsListenerRegistered = true
+            }
         } catch (_: SecurityException) {
             // Notification access not granted yet
+            sessionsListenerRegistered = false
             activeController = null
             emitCurrentMedia()
         } catch (_: Exception) {
@@ -132,7 +140,11 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
         }
     }
 
-    fun getCurrentMediaData(): Map<String, Any?> {
+    /**
+     * [knownArtworkKey] is the artwork the caller already holds; the artwork
+     * bytes are left out when they haven't changed since.
+     */
+    fun getCurrentMediaData(knownArtworkKey: String? = null): Map<String, Any?> {
         val controller = activeController ?: return emptyMap()
         val metadata = controller.metadata
         val state = controller.playbackState
@@ -176,6 +188,7 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
 
         // Resolve Artwork
         val artworkBytes = resolveArtworkBytes(metadata, title, artist)
+        val artworkKey = if (artworkBytes != null) cachedArtworkKey else null
 
         return mapOf(
             "hasActiveSession" to true,
@@ -194,7 +207,8 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
             "canNext" to canNext,
             "canPrevious" to canPrevious,
             "canSeek" to canSeek,
-            "artwork" to artworkBytes
+            "artworkKey" to artworkKey,
+            "artwork" to if (artworkKey != null && artworkKey != knownArtworkKey) artworkBytes else null
         )
     }
 
@@ -253,9 +267,14 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
     }
 
     private fun emitCurrentMedia() {
-        val data = getCurrentMediaData()
+        // Nobody is listening (app in the background): skip building the payload.
+        if (eventSink == null) return
+
+        val data = getCurrentMediaData(lastEmittedArtworkKey)
         mainHandler.post {
-            eventSink?.success(data)
+            val sink = eventSink ?: return@post
+            lastEmittedArtworkKey = data["artworkKey"] as String?
+            sink.success(data)
         }
     }
 
@@ -283,11 +302,13 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         eventSink = events
+        lastEmittedArtworkKey = null
         refreshSessions()
         emitCurrentMedia()
     }
 
     override fun onCancel(arguments: Any?) {
         eventSink = null
+        lastEmittedArtworkKey = null
     }
 }

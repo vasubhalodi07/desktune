@@ -7,24 +7,32 @@ class ProgressSlider extends StatefulWidget {
   final MediaInfo media;
   final ValueChanged<int>? onSeek;
 
-  const ProgressSlider({
-    super.key,
-    required this.media,
-    this.onSeek,
-  });
+  const ProgressSlider({super.key, required this.media, this.onSeek});
 
   @override
   State<ProgressSlider> createState() => _ProgressSliderState();
 }
 
-class _ProgressSliderState extends State<ProgressSlider> {
+class _ProgressSliderState extends State<ProgressSlider>
+    with WidgetsBindingObserver {
   Timer? _ticker;
   double? _dragValue;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startTicker();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTicker();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _ticker?.cancel();
+    }
   }
 
   @override
@@ -42,7 +50,9 @@ class _ProgressSliderState extends State<ProgressSlider> {
   void _startTicker() {
     _ticker?.cancel();
     if (widget.media.isPlaying) {
-      _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      // The time labels change once a second and the thumb moves a pixel or
+      // two per second, so a faster tick only wastes wake-ups.
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted && _dragValue == null) {
           setState(() {});
         }
@@ -52,6 +62,7 @@ class _ProgressSliderState extends State<ProgressSlider> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     super.dispose();
   }

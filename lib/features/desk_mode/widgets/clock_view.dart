@@ -1,12 +1,13 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../app/theme.dart';
 import '../../../models/app_settings.dart';
 import '../../../services/battery_service.dart';
+import '../../../services/time_format.dart';
 
 class ClockView extends StatelessWidget {
-  final DateTime dateTime;
+  final ValueListenable<DateTime> time;
   final AppSettings settings;
   final BatteryInfo? batteryInfo;
   final bool isExpanded;
@@ -17,7 +18,7 @@ class ClockView extends StatelessWidget {
 
   const ClockView({
     super.key,
-    required this.dateTime,
+    required this.time,
     required this.settings,
     this.batteryInfo,
     this.isExpanded = false,
@@ -29,20 +30,28 @@ class ClockView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Only the clock rebuilds on a tick; the rest of the screen is untouched.
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: time,
+      builder: (context, dateTime, _) => _buildClock(dateTime),
+    );
+  }
+
+  Widget _buildClock(DateTime dateTime) {
     // Seconds are never rendered on the split music screen
     final showSeconds = isExpanded && settings.showSeconds;
     final hoursStr = settings.is24HourFormat
-        ? DateFormat('HH').format(dateTime)
-        : DateFormat('h').format(dateTime);
-    final minutesStr = DateFormat('mm').format(dateTime);
-    final secondsStr = showSeconds ? DateFormat('ss').format(dateTime) : '';
+        ? TimeFormat.hour24(dateTime)
+        : TimeFormat.hour12(dateTime);
+    final minutesStr = TimeFormat.minute(dateTime);
+    final secondsStr = showSeconds ? TimeFormat.second(dateTime) : '';
     final amPmStr = settings.is24HourFormat
         ? ''
-        : DateFormat('a').format(dateTime).toUpperCase();
+        : TimeFormat.meridiem(dateTime);
 
-    final dayShort = DateFormat('EEE').format(dateTime).toUpperCase();
-    final dayNum = DateFormat('d').format(dateTime);
-    final monthFull = DateFormat('MMMM').format(dateTime);
+    final dayShort = TimeFormat.weekdayShort(dateTime);
+    final dayNum = TimeFormat.dayOfMonth(dateTime);
+    final monthFull = TimeFormat.monthName(dateTime);
 
     // Comfortaa rounded clock typography
     final clockFontSize = isExpanded ? 210.0 : 130.0;
@@ -63,7 +72,10 @@ class ClockView extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),

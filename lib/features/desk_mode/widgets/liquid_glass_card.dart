@@ -1,7 +1,16 @@
 import 'dart:math' as math;
-import 'dart:ui';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import '../../../services/animation_clock.dart';
 
+/// Frosted "liquid glass" card whose colours follow the album artwork.
+///
+/// Built to be cheap enough to leave on all day:
+/// * It draws no backdrop blur; everything behind the card is already soft.
+/// * The glow and drop shadow are one static, cacheable layer.
+/// * The drifting colour mesh only animates while [animate] is true, driven by
+///   the shared low-frame-rate [AnimationClock] rather than a 120 Hz controller.
+///   When it is false the card is a still image and produces no frames.
 class LiquidGlassCard extends StatefulWidget {
   final Widget child;
   final double borderRadius;
@@ -10,7 +19,12 @@ class LiquidGlassCard extends StatefulWidget {
   final VoidCallback? onTap;
   final Color? accentColor;
   final List<Color>? paletteColors;
+
+  /// Draws the coloured glow and drop shadow behind the card.
   final bool showShadow;
+
+  /// Drifts the colour mesh (only has an effect when there are artwork colours).
+  final bool animate;
 
   const LiquidGlassCard({
     super.key,
@@ -22,29 +36,48 @@ class LiquidGlassCard extends StatefulWidget {
     this.accentColor,
     this.paletteColors,
     this.showShadow = true,
+    this.animate = false,
   });
 
   @override
   State<LiquidGlassCard> createState() => _LiquidGlassCardState();
 }
 
-class _LiquidGlassCardState extends State<LiquidGlassCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+class _LiquidGlassCardState extends State<LiquidGlassCard> {
+  /// Room around the card for the glow to paint into (blur reaches ~3 sigma).
+  static const double _glowExtent = 100;
+
+  bool _holdingClock = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 14),
-    )..repeat();
+    _syncClock();
+  }
+
+  @override
+  void didUpdateWidget(covariant LiquidGlassCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncClock();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_holdingClock) AnimationClock.instance.release();
     super.dispose();
+  }
+
+  bool get _shouldAnimate => widget.animate && _resolveColors().isNotEmpty;
+
+  void _syncClock() {
+    final want = _shouldAnimate;
+    if (want && !_holdingClock) {
+      AnimationClock.instance.acquire();
+      _holdingClock = true;
+    } else if (!want && _holdingClock) {
+      AnimationClock.instance.release();
+      _holdingClock = false;
+    }
   }
 
   List<Color> _resolveColors() {
@@ -82,199 +115,231 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
     final colors = _resolveColors();
     final hasColors = colors.isNotEmpty;
 
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final progress = _controller.value;
-        final t = progress * 2 * math.pi;
-
-        final Color primaryColor = hasColors ? colors[0] : Colors.transparent;
-        final Color secondaryColor = hasColors ? colors[1] : Colors.transparent;
-        final Color tertiaryColor = hasColors ? colors[2] : Colors.transparent;
-
-        // Animated Traveling Liquid Glass Body
-        final Widget glassBody = ClipRRect(
-          borderRadius: BorderRadius.circular(widget.borderRadius),
-          child: Stack(
-            children: [
-              // Liquid Moving Chromatic Mesh Orbs (Underneath the Blur)
-              if (hasColors)
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _LiquidMeshPainter(
-                      progress: progress,
-                      color1: primaryColor,
-                      color2: secondaryColor,
-                      color3: tertiaryColor,
-                    ),
+    Widget content = Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        // Multi-colour ambient glow + deep drop shadow (behind the card).
+        // Static, so the raster cache keeps it as a texture.
+        if (hasColors && widget.showShadow)
+          Positioned(
+            left: -_glowExtent,
+            top: -_glowExtent,
+            right: -_glowExtent,
+            bottom: -_glowExtent,
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  isComplex: true,
+                  painter: _GlowPainter(
+                    primary: colors[0],
+                    secondary: colors[1],
+                    radius: widget.borderRadius,
+                    inset: _glowExtent,
                   ),
-                ),
-
-              // Frosted Glass Layer
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: Container(
-                  padding: widget.padding ?? const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(widget.borderRadius),
-                    gradient: LinearGradient(
-                      begin: Alignment(
-                        0.75 * math.sin(t * 0.7),
-                        -0.85 * math.cos(t * 0.7),
-                      ),
-                      end: Alignment(
-                        -0.75 * math.sin(t * 0.7),
-                        0.85 * math.cos(t * 0.7),
-                      ),
-                      colors: [
-                        hasColors
-                            ? primaryColor.withValues(alpha: 0.13)
-                            : Colors.white.withValues(alpha: 0.10),
-                        hasColors
-                            ? secondaryColor.withValues(alpha: 0.07)
-                            : Colors.white.withValues(alpha: 0.03),
-                      ],
-                    ),
-                  ),
-                  child: widget.child,
                 ),
               ),
-            ],
+            ),
           ),
-        );
 
-        Widget content = Stack(
-          alignment: Alignment.center,
-          children: [
-            // Multi-Color Traveling Ambient Diffused Glow (Behind the Card)
-            if (hasColors && widget.showShadow)
-              Positioned.fill(
-                child: Container(
-                  margin: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(widget.borderRadius),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(
-                          alpha: 0.28 + 0.06 * math.sin(t),
-                        ),
-                        blurRadius: 46 + 8 * math.sin(t * 1.3),
-                        spreadRadius: 3 + 2 * math.cos(t),
-                        offset: Offset(6 * math.sin(t), 6 + 2 * math.cos(t)),
+        // Glass body
+        RepaintBoundary(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+            child: Stack(
+              children: [
+                // Animated layer: colour mesh + sheen. Repaints on its own
+                // without rebuilding or repainting the card contents.
+                Positioned.fill(
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _GlassPainter(
+                        colors: colors,
+                        animate: _shouldAnimate,
                       ),
-                      BoxShadow(
-                        color: secondaryColor.withValues(
-                          alpha: 0.18 + 0.05 * math.cos(t),
-                        ),
-                        blurRadius: 38 + 6 * math.cos(t * 0.8),
-                        spreadRadius: 1,
-                        offset: Offset(-5 * math.cos(t * 0.7), 4),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-
-            // Deep black ambient drop shadow for elevation
-            if (widget.showShadow)
-              Positioned.fill(
-                child: Container(
-                  margin: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(widget.borderRadius),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.42),
-                        blurRadius: 22,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+                RepaintBoundary(
+                  child: Padding(
+                    padding: widget.padding ?? const EdgeInsets.all(20),
+                    child: widget.child,
                   ),
                 ),
-              ),
-
-            // Glass Body
-            RepaintBoundary(child: glassBody),
-          ],
-        );
-
-        if (widget.margin != null) {
-          content = Padding(padding: widget.margin!, child: content);
-        }
-
-        if (widget.onTap != null) {
-          return GestureDetector(onTap: widget.onTap, child: content);
-        }
-
-        return content;
-      },
+              ],
+            ),
+          ),
+        ),
+      ],
     );
+
+    if (widget.margin != null) {
+      content = Padding(padding: widget.margin!, child: content);
+    }
+
+    if (widget.onTap != null) {
+      return GestureDetector(onTap: widget.onTap, child: content);
+    }
+
+    return content;
   }
 }
 
-class _LiquidMeshPainter extends CustomPainter {
-  final double progress;
-  final Color color1;
-  final Color color2;
-  final Color color3;
+/// Coloured glow and black drop shadow behind the card, painted once.
+class _GlowPainter extends CustomPainter {
+  final Color primary;
+  final Color secondary;
+  final double radius;
 
-  _LiquidMeshPainter({
-    required this.progress,
-    required this.color1,
-    required this.color2,
-    required this.color3,
+  /// Distance from this painter's edge to the card's edge on every side.
+  final double inset;
+
+  const _GlowPainter({
+    required this.primary,
+    required this.secondary,
+    required this.radius,
+    required this.inset,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final t = progress * 2 * math.pi;
+    final card = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        inset,
+        inset,
+        size.width - 2 * inset,
+        size.height - 2 * inset,
+      ),
+      Radius.circular(radius),
+    );
 
-    // Orb 1 (Primary): Travels smoothly along an oval orbit from top-left toward center
+    final glowBox = card.deflate(4);
+    final primaryGlow = BoxShadow(
+      color: primary.withValues(alpha: 0.28),
+      blurRadius: 46,
+      spreadRadius: 5,
+      offset: const Offset(0, 8),
+    );
+    final secondaryGlow = BoxShadow(
+      color: secondary.withValues(alpha: 0.23),
+      blurRadius: 44,
+      spreadRadius: 1,
+      offset: const Offset(-5, 4),
+    );
+    final dropShadow = BoxShadow(
+      color: Colors.black.withValues(alpha: 0.42),
+      blurRadius: 22,
+      offset: const Offset(0, 8),
+    );
+
+    for (final shadow in [primaryGlow, secondaryGlow]) {
+      canvas.drawRRect(
+        glowBox.inflate(shadow.spreadRadius).shift(shadow.offset),
+        shadow.toPaint(),
+      );
+    }
+    canvas.drawRRect(
+      card.deflate(2).shift(dropShadow.offset),
+      dropShadow.toPaint(),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlowPainter old) {
+    return old.primary != primary ||
+        old.secondary != secondary ||
+        old.radius != radius ||
+        old.inset != inset;
+  }
+}
+
+/// The card's colour mesh and sheen. Repaints on each [AnimationClock] tick
+/// while [animate] is true; otherwise it is painted once at a fixed phase.
+class _GlassPainter extends CustomPainter {
+  final List<Color> colors;
+  final bool animate;
+
+  static const int _cycleMs = 14000;
+  static const double _stillPhase = 0.0;
+
+  _GlassPainter({required this.colors, required this.animate})
+    : super(repaint: animate ? AnimationClock.instance : null);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final progress = animate
+        ? (AnimationClock.instance.elapsed.inMilliseconds % _cycleMs) / _cycleMs
+        : _stillPhase;
+    final t = progress * 2 * math.pi;
+    final rect = Offset.zero & size;
+    final hasColors = colors.isNotEmpty;
+
+    if (hasColors) {
+      _paintMesh(canvas, size, t);
+    }
+
+    final sheen = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment(0.75 * math.sin(t * 0.7), -0.85 * math.cos(t * 0.7)),
+        end: Alignment(-0.75 * math.sin(t * 0.7), 0.85 * math.cos(t * 0.7)),
+        colors: [
+          hasColors
+              ? colors[0].withValues(alpha: 0.13)
+              : Colors.white.withValues(alpha: 0.10),
+          hasColors
+              ? colors[1].withValues(alpha: 0.07)
+              : Colors.white.withValues(alpha: 0.03),
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, sheen);
+  }
+
+  void _paintMesh(Canvas canvas, Size size, double t) {
+    // Orb 1 (Primary): oval orbit from top-left toward center
     final c1 = Offset(
       size.width * (0.30 + 0.24 * math.sin(t)),
       size.height * (0.35 + 0.22 * math.cos(t)),
     );
     final r1 = size.width * 0.46;
 
-    // Orb 2 (Secondary): Counter-phase orbit across the right diagonal
+    // Orb 2 (Secondary): counter-phase orbit across the right diagonal
     final c2 = Offset(
       size.width * (0.70 - 0.24 * math.cos(t * 0.85 + 0.5)),
       size.height * (0.65 - 0.20 * math.sin(t * 0.85 + 0.5)),
     );
     final r2 = size.width * 0.42;
 
-    // Orb 3 (Tertiary): Bottom center floating wave
+    // Orb 3 (Tertiary): bottom center floating wave
     final c3 = Offset(
       size.width * (0.50 + 0.25 * math.sin(t * 1.2 + 1.2)),
       size.height * (0.74 + 0.16 * math.cos(t * 1.2 + 1.2)),
     );
     final r3 = size.width * 0.38;
 
-    final paint1 = Paint()
-      ..shader = RadialGradient(
-        colors: [color1.withValues(alpha: 0.26), color1.withValues(alpha: 0.0)],
-      ).createShader(Rect.fromCircle(center: c1, radius: r1));
+    _orb(canvas, c1, r1, colors[0], 0.26);
+    _orb(canvas, c2, r2, colors[1], 0.20);
+    _orb(canvas, c3, r3, colors[2], 0.15);
+  }
 
-    final paint2 = Paint()
+  void _orb(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Color color,
+    double alpha,
+  ) {
+    final paint = Paint()
       ..shader = RadialGradient(
-        colors: [color2.withValues(alpha: 0.20), color2.withValues(alpha: 0.0)],
-      ).createShader(Rect.fromCircle(center: c2, radius: r2));
-
-    final paint3 = Paint()
-      ..shader = RadialGradient(
-        colors: [color3.withValues(alpha: 0.15), color3.withValues(alpha: 0.0)],
-      ).createShader(Rect.fromCircle(center: c3, radius: r3));
-
-    canvas.drawCircle(c1, r1, paint1);
-    canvas.drawCircle(c2, r2, paint2);
-    canvas.drawCircle(c3, r3, paint3);
+        colors: [
+          color.withValues(alpha: alpha),
+          color.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawCircle(center, radius, paint);
   }
 
   @override
-  bool shouldRepaint(covariant _LiquidMeshPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.color1 != color1 ||
-        oldDelegate.color2 != color2 ||
-        oldDelegate.color3 != color3;
+  bool shouldRepaint(covariant _GlassPainter old) {
+    return old.animate != animate || !listEquals(old.colors, colors);
   }
 }

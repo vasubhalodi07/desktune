@@ -56,8 +56,15 @@ class BatteryBridge(private val context: Context) : EventChannel.StreamHandler {
         )
     }
 
-    private fun sendBatteryUpdate() {
+    // ACTION_BATTERY_CHANGED also fires for voltage and temperature changes;
+    // only forward updates where the level or charging state actually changed.
+    private var lastSent: Pair<Any?, Any?>? = null
+
+    private fun sendBatteryUpdate(force: Boolean = false) {
         val data = getBatteryData()
+        val current = Pair(data["level"], data["isCharging"])
+        if (!force && current == lastSent) return
+        lastSent = current
         mainHandler.post {
             eventSink?.success(data)
         }
@@ -65,7 +72,7 @@ class BatteryBridge(private val context: Context) : EventChannel.StreamHandler {
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         eventSink = events
-        sendBatteryUpdate()
+        sendBatteryUpdate(force = true)
 
         if (batteryReceiver == null) {
             batteryReceiver = object : BroadcastReceiver() {
@@ -94,6 +101,7 @@ class BatteryBridge(private val context: Context) : EventChannel.StreamHandler {
 
     override fun onCancel(arguments: Any?) {
         eventSink = null
+        lastSent = null
         if (batteryReceiver != null) {
             try {
                 context.unregisterReceiver(batteryReceiver)

@@ -22,20 +22,53 @@ class MediaControllerService {
   StreamSubscription? _mediaSub;
   StreamSubscription? _volumeSub;
 
+  // The artwork most recently received. The native side only re-sends the
+  // bytes when the artwork changes; this keeps the same instance in between so
+  // the image isn't decoded again on every playback event.
+  String? _artworkKey;
+  Uint8List? _artworkBytes;
+
   Future<void> init() async {
-    // Cancel any existing subscriptions before re-initialising
+    await checkPermission();
+    await _subscribe();
+
+    // Initial query
+    await refreshSessions();
+    await getVolume();
+    await getBrightness();
+  }
+
+  /// Stops the native event streams while the app is in the background so the
+  /// bridges stop building and sending updates nobody is looking at.
+  Future<void> pause() async {
     await _mediaSub?.cancel();
     await _volumeSub?.cancel();
     _mediaSub = null;
     _volumeSub = null;
+  }
 
-    await checkPermission();
+  /// Restarts the streams after [pause] and catches up on anything missed.
+  Future<void> resume() async {
+    await _subscribe();
+    await refreshSessions();
+    await getVolume();
+  }
+
+  Future<void> _subscribe() async {
+    await _mediaSub?.cancel();
+    await _volumeSub?.cancel();
+    _mediaSub = null;
+    _volumeSub = null;
+    // A fresh subscription starts from a clean slate on the native side, so
+    // the first event carries the artwork bytes again.
+    _artworkKey = null;
+    _artworkBytes = null;
 
     try {
       _mediaSub = _mediaEvents.receiveBroadcastStream().listen(
         (dynamic event) {
           if (event is Map) {
-            mediaInfo.value = MediaInfo.fromMap(event);
+            mediaInfo.value = _parseMedia(event);
           }
         },
         onError: (dynamic error) {
@@ -63,11 +96,28 @@ class MediaControllerService {
     } catch (e) {
       debugPrint('Failed to subscribe to volume events: $e');
     }
+  }
 
-    // Initial query
-    await refreshSessions();
-    await getVolume();
-    await getBrightness();
+  MediaInfo _parseMedia(Map<dynamic, dynamic> map) {
+    if (map.isEmpty || map['hasActiveSession'] != true) {
+      _artworkKey = null;
+      _artworkBytes = null;
+      return const MediaInfo();
+    }
+
+    Uint8List? artwork;
+    final key = map['artworkKey'] as String?;
+    if (key == null) {
+      _artworkKey = null;
+      _artworkBytes = null;
+    } else if (key == _artworkKey && _artworkBytes != null) {
+      artwork = _artworkBytes;
+    } else if (map['artwork'] is Uint8List) {
+      _artworkKey = key;
+      _artworkBytes = map['artwork'] as Uint8List;
+      artwork = _artworkBytes;
+    }
+    return MediaInfo.fromMap(map, artwork: artwork);
   }
 
   Future<bool> checkPermission() async {
@@ -117,9 +167,10 @@ class MediaControllerService {
     try {
       final res = await _methodChannel.invokeMapMethod<dynamic, dynamic>(
         'getCurrentMedia',
+        {'knownArtworkKey': _artworkKey},
       );
       if (res != null) {
-        mediaInfo.value = MediaInfo.fromMap(res);
+        mediaInfo.value = _parseMedia(res);
       }
     } catch (e) {
       debugPrint('Error refreshing sessions: $e');

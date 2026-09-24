@@ -108,7 +108,11 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                 }
             }
             "getCurrentMedia" -> {
-                result.success(MediaSessionBridge.instance.getCurrentMediaData())
+                result.success(
+                    MediaSessionBridge.instance.getCurrentMediaData(
+                        call.argument<String>("knownArtworkKey")
+                    )
+                )
             }
             "togglePlayPause" -> {
                 MediaSessionBridge.instance.togglePlayPause()
