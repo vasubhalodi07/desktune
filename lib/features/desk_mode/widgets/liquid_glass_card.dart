@@ -45,7 +45,7 @@ class LiquidGlassCard extends StatefulWidget {
 
 class _LiquidGlassCardState extends State<LiquidGlassCard> {
   /// Room around the card for the glow to paint into (blur reaches ~3 sigma).
-  static const double _glowExtent = 100;
+  static const double _glowExtent = 56;
 
   bool _holdingClock = false;
 
@@ -214,22 +214,22 @@ class _GlowPainter extends CustomPainter {
     );
 
     final glowBox = card.deflate(4);
+    // A low, subtle lift: the card should sit just above the background rather
+    // than float far off it. Keep the blur small enough to fit in _glowExtent.
     final primaryGlow = BoxShadow(
-      color: primary.withValues(alpha: 0.28),
-      blurRadius: 46,
-      spreadRadius: 5,
-      offset: const Offset(0, 8),
+      color: primary.withValues(alpha: 0.14),
+      blurRadius: 26,
+      offset: const Offset(0, 3),
     );
     final secondaryGlow = BoxShadow(
-      color: secondary.withValues(alpha: 0.23),
-      blurRadius: 44,
-      spreadRadius: 1,
-      offset: const Offset(-5, 4),
+      color: secondary.withValues(alpha: 0.10),
+      blurRadius: 24,
+      offset: const Offset(-2, 2),
     );
     final dropShadow = BoxShadow(
-      color: Colors.black.withValues(alpha: 0.42),
-      blurRadius: 22,
-      offset: const Offset(0, 8),
+      color: Colors.black.withValues(alpha: 0.20),
+      blurRadius: 10,
+      offset: const Offset(0, 3),
     );
 
     for (final shadow in [primaryGlow, secondaryGlow]) {

@@ -163,6 +163,33 @@ class MediaControllerService {
     }
   }
 
+  // App icons never change while the app runs, so fetch each one only once.
+  final Map<String, Uint8List?> _appIcons = {};
+
+  /// The launcher icon (PNG) of [packageName], or null if Android can't supply it.
+  Future<Uint8List?> appIconFor(String packageName) async {
+    if (packageName.isEmpty) return null;
+    if (_appIcons.containsKey(packageName)) return _appIcons[packageName];
+    Uint8List? icon;
+    try {
+      icon = await _methodChannel.invokeMethod<Uint8List>('getAppIcon', {
+        'packageName': packageName,
+      });
+    } catch (e) {
+      debugPrint('Error loading app icon: $e');
+    }
+    return _appIcons[packageName] = icon;
+  }
+
+  /// Opens the app that is playing (its now-playing screen when it offers one).
+  Future<void> openPlayerApp() async {
+    try {
+      await _methodChannel.invokeMethod('openPlayerApp');
+    } catch (e) {
+      debugPrint('Error opening player app: $e');
+    }
+  }
+
   Future<void> refreshSessions() async {
     try {
       final res = await _methodChannel.invokeMapMethod<dynamic, dynamic>(

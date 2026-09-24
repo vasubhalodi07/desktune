@@ -1,4 +1,7 @@
 class AppSettings {
+  /// Follow the phone's own 12/24-hour setting. When false, [is24HourFormat]
+  /// decides.
+  final bool followSystemTimeFormat;
   final bool is24HourFormat;
   final bool showSeconds;
   final bool showDate;
@@ -7,6 +10,7 @@ class AppSettings {
   final bool keepScreenAwake;
 
   const AppSettings({
+    this.followSystemTimeFormat = true,
     this.is24HourFormat = false,
     this.showSeconds = false,
     this.showDate = true,
@@ -16,6 +20,7 @@ class AppSettings {
   });
 
   AppSettings copyWith({
+    bool? followSystemTimeFormat,
     bool? is24HourFormat,
     bool? showSeconds,
     bool? showDate,
@@ -24,6 +29,8 @@ class AppSettings {
     bool? keepScreenAwake,
   }) {
     return AppSettings(
+      followSystemTimeFormat:
+          followSystemTimeFormat ?? this.followSystemTimeFormat,
       is24HourFormat: is24HourFormat ?? this.is24HourFormat,
       showSeconds: showSeconds ?? this.showSeconds,
       showDate: showDate ?? this.showDate,
@@ -35,6 +42,7 @@ class AppSettings {
 
   Map<String, dynamic> toMap() {
     return {
+      'followSystemTimeFormat': followSystemTimeFormat,
       'is24HourFormat': is24HourFormat,
       'showSeconds': showSeconds,
       'showDate': showDate,
@@ -44,8 +52,14 @@ class AppSettings {
     };
   }
 
+  /// These settings with [is24HourFormat] resolved for display: the phone's own
+  /// setting when [followSystemTimeFormat] is on, otherwise the user's choice.
+  AppSettings withSystemTimeFormat({required bool systemIs24Hour}) =>
+      followSystemTimeFormat ? copyWith(is24HourFormat: systemIs24Hour) : this;
+
   factory AppSettings.fromMap(Map<dynamic, dynamic> map) {
     return AppSettings(
+      followSystemTimeFormat: map['followSystemTimeFormat'] as bool? ?? true,
       is24HourFormat: map['is24HourFormat'] as bool? ?? false,
       showSeconds: map['showSeconds'] as bool? ?? false,
       showDate: map['showDate'] as bool? ?? true,

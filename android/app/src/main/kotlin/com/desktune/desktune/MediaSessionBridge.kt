@@ -1,13 +1,19 @@
 package com.desktune.desktune
 
+import android.app.ActivityOptions
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.EventChannel
@@ -35,6 +41,10 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
 
     // The sessions-changed listener only needs registering once per connection.
     private var sessionsListenerRegistered = false
+
+    // Display name of the app that owns the active session (looked up once per app).
+    private var cachedLabelPackage: String? = null
+    private var cachedLabel: String = ""
 
     private val sessionsChangedListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
@@ -193,6 +203,7 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
         return mapOf(
             "hasActiveSession" to true,
             "packageName" to controller.packageName,
+            "appName" to appLabelFor(controller.packageName),
             "title" to title,
             "artist" to artist,
             "album" to album,
@@ -210,6 +221,90 @@ class MediaSessionBridge private constructor() : EventChannel.StreamHandler {
             "artworkKey" to artworkKey,
             "artwork" to if (artworkKey != null && artworkKey != knownArtworkKey) artworkBytes else null
         )
+    }
+
+    /** The player's user-facing name (e.g. "Amazon Music"), or "" if unavailable. */
+    @Suppress("DEPRECATION")
+    private fun appLabelFor(packageName: String): String {
+        if (packageName == cachedLabelPackage) return cachedLabel
+        val label = try {
+            val pm = context?.packageManager
+            if (pm == null) "" else pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
+        } catch (_: Exception) {
+            ""
+        }
+        cachedLabelPackage = packageName
+        cachedLabel = label
+        return label
+    }
+
+    /**
+     * The app's launcher icon as a square PNG, or null if Android can't supply it
+     * (the UI then shows a default). Adaptive icons are drawn with the system's
+     * shape mask, so the result matches what the launcher shows.
+     */
+    fun appIconPng(packageName: String, sizePx: Int = 128): ByteArray? {
+        return try {
+            val drawable = context?.packageManager?.getApplicationIcon(packageName) ?: return null
+            val bitmap = drawableToBitmap(drawable, sizePx)
+            val stream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            stream.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun drawableToBitmap(drawable: Drawable, sizePx: Int): Bitmap {
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, sizePx, sizePx)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
+    /**
+     * Opens the app that owns the active session. Prefers the screen the player
+     * registered for itself (its now-playing screen) and falls back to launching
+     * the app. Returns false if there is nothing to open.
+     */
+    fun openPlayerApp(): Boolean {
+        val ctx = context ?: return false
+        val controller = activeController ?: return false
+
+        val sessionActivity: PendingIntent? = controller.sessionActivity
+        if (sessionActivity != null) {
+            try {
+                sessionActivity.send(ctx, 0, null, null, null, null, foregroundLaunchOptions())
+                return true
+            } catch (_: PendingIntent.CanceledException) {
+                // Fall through to the launcher intent.
+            }
+        }
+
+        val launch = ctx.packageManager.getLaunchIntentForPackage(controller.packageName)
+            ?: return false
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            ctx.startActivity(launch)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Android 14+ silently blocks a PendingIntent that opens another app's screen
+     * unless the sender explicitly opts in. DeskTune is in the foreground when the
+     * user taps, so it is allowed to; older versions need no options.
+     */
+    private fun foregroundLaunchOptions(): android.os.Bundle? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return null
+        return ActivityOptions.makeBasic()
+            .setPendingIntentBackgroundActivityStartMode(
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+            )
+            .toBundle()
     }
 
     private fun resolveArtworkBytes(metadata: MediaMetadata?, title: String, artist: String): ByteArray? {

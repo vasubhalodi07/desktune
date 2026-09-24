@@ -11,12 +11,15 @@ import '../../services/clock_service.dart';
 import '../../services/media_controller_service.dart';
 import '../../services/settings_service.dart';
 import '../settings/settings_screen.dart';
+import 'widgets/burn_in_shift.dart';
 import 'widgets/clock_view.dart';
+import 'widgets/desk_layout.dart';
 import 'widgets/ios_control_slider.dart';
 import 'widgets/liquid_glass_card.dart';
 import 'widgets/music_artwork.dart';
 import 'widgets/music_controls.dart';
 import 'widgets/music_info.dart';
+import 'widgets/player_app_icon.dart';
 import 'widgets/progress_slider.dart';
 
 enum DeskViewMode { dual, fullClock, fullMusic }
@@ -175,6 +178,8 @@ class _DeskModeScreenState extends State<DeskModeScreen>
     widget.clockService.start();
     widget.mediaService.resume();
     _batteryService.init();
+    // The 12/24-hour setting may have changed while the app was away.
+    widget.settingsService.refreshSystemTimeFormat();
     _resetInactivityTimer();
     // Retry once more to handle slow listener reconnections on MIUI
     Future.delayed(const Duration(seconds: 2), () {
@@ -237,34 +242,48 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         child: Stack(
           children: [
             // Main StandBy Stage. The clock ticks inside ClockView only, so a tick
-            // never rebuilds the music card or sliders.
-            SafeArea(
-              child: ValueListenableBuilder<AppSettings>(
-                valueListenable: widget.settingsService.settings,
-                builder: (context, settings, _) {
-                  return ValueListenableBuilder<MediaInfo>(
-                    valueListenable: widget.mediaService.mediaInfo,
-                    builder: (context, media, _) {
-                      return ValueListenableBuilder<BatteryInfo>(
-                        valueListenable: _batteryService.batteryInfo,
-                        builder: (context, batteryInfo, _) {
-                          return AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 380),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            layoutBuilder: _viewLayoutBuilder,
-                            transitionBuilder: _viewTransitionBuilder,
-                            child: _buildCurrentView(
-                              settings: settings,
-                              media: media,
-                              batteryInfo: batteryInfo,
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
+            // never rebuilds the music card or sliders. Burn-in protection steps
+            // the whole stage a few pixels each minute.
+            BurnInShift(
+              time: widget.clockService.currentTime,
+              child: SymmetricSafeArea(
+                child: ValueListenableBuilder<AppSettings>(
+                  valueListenable: widget.settingsService.settings,
+                  builder: (context, settings, _) {
+                    return ValueListenableBuilder<MediaInfo>(
+                      valueListenable: widget.mediaService.mediaInfo,
+                      builder: (context, media, _) {
+                        return ValueListenableBuilder<BatteryInfo>(
+                          valueListenable: _batteryService.batteryInfo,
+                          builder: (context, batteryInfo, _) {
+                            return ValueListenableBuilder<bool>(
+                              valueListenable:
+                                  widget.settingsService.systemIs24Hour,
+                              builder: (context, systemIs24Hour, _) {
+                                return AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 380),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  layoutBuilder: _viewLayoutBuilder,
+                                  transitionBuilder: _viewTransitionBuilder,
+                                  child: _buildCurrentView(
+                                    // Resolve "follow the phone" into a concrete
+                                    // 12/24-hour choice for the clock.
+                                    settings: settings.withSystemTimeFormat(
+                                      systemIs24Hour: systemIs24Hour,
+                                    ),
+                                    media: media,
+                                    batteryInfo: batteryInfo,
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
 
@@ -388,62 +407,46 @@ class _DeskModeScreenState extends State<DeskModeScreen>
   ) {
     final hasMusic = media.hasActiveSession && media.hasContent;
 
-    return Row(
+    // One balanced composition: the clock and the player are designed at a fixed
+    // size and scaled together to fit any screen, so the space on the left and
+    // right is always equal (see DeskSplitLayout).
+    return DeskSplitLayout(
       key: const ValueKey(DeskViewMode.dual),
-      children: [
-        // Left Half: StandBy Clock (Directly renders Settings & Full Clock icon buttons)
-        Expanded(
-          flex: 5,
-          child: Center(
-            child: ClockView(
-              time: widget.clockService.currentTime,
-              settings: settings,
-              batteryInfo: batteryInfo,
-              isExpanded: false,
-              onSettingsTap: _openSettings,
-              onExpandTap: _openFullClock,
-            ),
-          ),
+      // Clock half (Settings & Full Clock buttons are part of the clock view).
+      left: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: ClockView(
+          time: widget.clockService.currentTime,
+          settings: settings,
+          batteryInfo: batteryInfo,
+          isExpanded: false,
+          onSettingsTap: _openSettings,
+          onExpandTap: _openFullClock,
         ),
-
-        // Right Half: Liquid Glass Music Card + Horizontal Sliders Below
-        Expanded(
-          flex: 6,
-          child: RepaintBoundary(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 20, top: 12, bottom: 12),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      LiquidGlassCard(
-                        borderRadius: 28,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 12,
-                        ),
-                        accentColor: _artworkAccentColor,
-                        paletteColors: _artworkColors,
-                        showShadow: hasMusic,
-                        animate: media.isPlaying,
-                        child: hasMusic
-                            ? _buildActiveCardContent(media, false)
-                            : _buildEmptyCardContent(),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildHorizontalSliders(height: 44.0),
-                    ],
-                  ),
-                ),
-              ),
+      ),
+      // Player half: the glass card with the brightness / volume sliders below.
+      right: RepaintBoundary(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LiquidGlassCard(
+              borderRadius: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              accentColor: _artworkAccentColor,
+              paletteColors: _artworkColors,
+              showShadow: hasMusic,
+              animate: media.isPlaying,
+              child: hasMusic
+                  ? _buildActiveCardContent(media, false)
+                  : _buildEmptyCardContent(),
             ),
-          ),
+            // Breathing room between the player card and the sliders.
+            const SizedBox(height: 22),
+            _buildHorizontalSliders(height: 44.0),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -471,16 +474,25 @@ class _DeskModeScreenState extends State<DeskModeScreen>
       child: Stack(
         children: [
           // Geometrically centered clock (horizontal & vertical)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: ClockView(
-                time: widget.clockService.currentTime,
-                settings: settings,
-                batteryInfo: batteryInfo,
-                isExpanded: true,
-                showControls: _showControls,
-                onTap: _returnToSplitStandby,
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: DeskSplitLayout.marginFor(
+                MediaQuery.sizeOf(context).width,
+              ),
+              vertical: 12,
+            ),
+            // Scales the clock to fit: larger on tablets, smaller on small phones.
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: ClockView(
+                  time: widget.clockService.currentTime,
+                  settings: settings,
+                  batteryInfo: batteryInfo,
+                  isExpanded: true,
+                  showControls: _showControls,
+                  onTap: _returnToSplitStandby,
+                ),
               ),
             ),
           ),
@@ -576,7 +588,12 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            MusicArtwork(artworkBytes: media.artworkBytes, size: artworkSize),
+            // Tapping the artwork jumps to the app that is playing.
+            MusicArtwork(
+              artworkBytes: media.artworkBytes,
+              size: artworkSize,
+              onTap: widget.mediaService.openPlayerApp,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: MusicInfo(
@@ -600,13 +617,35 @@ class _DeskModeScreenState extends State<DeskModeScreen>
         ),
         const SizedBox(height: 6),
 
-        // Playback controls (Liquid Glass controls)
-        MusicControls(
-          media: media,
-          size: isExpanded ? 54 : 46,
-          onPrevious: () => widget.mediaService.previous(),
-          onTogglePlayPause: () => widget.mediaService.togglePlayPause(),
-          onNext: () => widget.mediaService.next(),
+        // Playback controls (Liquid Glass controls), kept centred. The playing
+        // app's icon uses the free space at the right end of the same row; the
+        // matching empty space on the left keeps the controls exactly centred.
+        Row(
+          children: [
+            const Expanded(child: SizedBox.shrink()),
+            MusicControls(
+              media: media,
+              size: isExpanded ? 54 : 46,
+              onPrevious: () => widget.mediaService.previous(),
+              onTogglePlayPause: () => widget.mediaService.togglePlayPause(),
+              onNext: () => widget.mediaService.next(),
+            ),
+            Expanded(
+              child: media.packageName.isEmpty
+                  ? const SizedBox.shrink()
+                  : Align(
+                      alignment: Alignment.centerRight,
+                      child: PlayerAppIcon(
+                        packageName: media.packageName,
+                        appName: media.appName,
+                        // Same size as the previous / next buttons beside it.
+                        size: (isExpanded ? 54 : 46) * 0.84,
+                        loadIcon: widget.mediaService.appIconFor,
+                        onTap: widget.mediaService.openPlayerApp,
+                      ),
+                    ),
+            ),
+          ],
         ),
       ],
     );
@@ -647,7 +686,7 @@ class _DeskModeScreenState extends State<DeskModeScreen>
           ),
           const SizedBox(height: 4),
           const Text(
-            'Play audio in Amazon Music or Spotify',
+            'Play something in any music app',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Comfortaa',

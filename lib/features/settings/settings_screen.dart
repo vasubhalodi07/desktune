@@ -51,6 +51,26 @@ class SettingsScreen extends StatelessWidget {
               _buildSectionHeader('CLOCK DISPLAY'),
               _buildGlassSection([
                 _buildCupertinoRow(
+                  icon: CupertinoIcons.clock,
+                  title: 'Follow Phone Time Format',
+                  value: settings.followSystemTimeFormat,
+                  onChanged: (val) => settingsService.updateSettings(
+                    settings.copyWith(followSystemTimeFormat: val),
+                  ),
+                  showDivider: true,
+                ),
+                // Only needed when not following the phone's own setting.
+                if (!settings.followSystemTimeFormat)
+                  _buildCupertinoRow(
+                    icon: CupertinoIcons.textformat_123,
+                    title: '24-Hour Time',
+                    value: settings.is24HourFormat,
+                    onChanged: (val) => settingsService.updateSettings(
+                      settings.copyWith(is24HourFormat: val),
+                    ),
+                    showDivider: true,
+                  ),
+                _buildCupertinoRow(
                   icon: CupertinoIcons.stopwatch,
                   title: 'Show Seconds',
                   value: settings.showSeconds,

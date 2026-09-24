@@ -9,15 +9,25 @@ class MusicArtwork extends StatelessWidget {
   final Uint8List? artworkBytes;
   final double size;
 
-  const MusicArtwork({super.key, required this.artworkBytes, this.size = 140});
+  /// Called when the artwork is tapped (used to open the player app).
+  final VoidCallback? onTap;
+
+  const MusicArtwork({
+    super.key,
+    required this.artworkBytes,
+    this.size = 140,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final hasArt = artworkBytes != null && artworkBytes!.isNotEmpty;
-    // The native side sends up to 800px; decode only what the screen shows.
-    final decodeWidth = (size * MediaQuery.devicePixelRatioOf(context)).round();
+    // The native side sends up to 800px; decode only what the screen shows, with
+    // some headroom because the layout scales up on tablets.
+    final decodeWidth = (size * MediaQuery.devicePixelRatioOf(context) * 1.5)
+        .round();
 
-    return SizedBox(
+    final tile = SizedBox(
       width: size,
       height: size,
       child: ClipRRect(
@@ -39,6 +49,13 @@ class MusicArtwork extends StatelessWidget {
               : _buildPlaceholder(),
         ),
       ),
+    );
+
+    if (onTap == null) return tile;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: tile,
     );
   }
 

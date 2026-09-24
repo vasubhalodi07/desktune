@@ -94,6 +94,68 @@ void main() {
       expect(fromMap.autoHideDelaySeconds, 10);
       expect(fromMap.keepScreenAwake, false);
     });
+
+    group('12/24-hour time format', () {
+      test('follows the phone by default, and old saved data does too', () {
+        expect(const AppSettings().followSystemTimeFormat, true);
+        // Settings saved before this option existed have no such key.
+        expect(
+          AppSettings.fromMap({'is24HourFormat': false}).followSystemTimeFormat,
+          true,
+        );
+      });
+
+      test('the choice is saved and restored', () {
+        final saved = const AppSettings().copyWith(
+          followSystemTimeFormat: false,
+          is24HourFormat: true,
+        );
+        final restored = AppSettings.fromMap(saved.toMap());
+        expect(restored.followSystemTimeFormat, false);
+        expect(restored.is24HourFormat, true);
+      });
+
+      test(
+        'following the phone uses the phone setting, whatever was chosen',
+        () {
+          const settings = AppSettings(is24HourFormat: false);
+          expect(
+            settings.withSystemTimeFormat(systemIs24Hour: true).is24HourFormat,
+            true,
+          );
+          expect(
+            settings.withSystemTimeFormat(systemIs24Hour: false).is24HourFormat,
+            false,
+          );
+
+          const chosen24 = AppSettings(is24HourFormat: true);
+          expect(
+            chosen24.withSystemTimeFormat(systemIs24Hour: false).is24HourFormat,
+            false,
+          );
+        },
+      );
+
+      test('not following uses the manual choice, whatever the phone says', () {
+        const manual12 = AppSettings(
+          followSystemTimeFormat: false,
+          is24HourFormat: false,
+        );
+        expect(
+          manual12.withSystemTimeFormat(systemIs24Hour: true).is24HourFormat,
+          false,
+        );
+
+        const manual24 = AppSettings(
+          followSystemTimeFormat: false,
+          is24HourFormat: true,
+        );
+        expect(
+          manual24.withSystemTimeFormat(systemIs24Hour: false).is24HourFormat,
+          true,
+        );
+      });
+    });
   });
 
   group('BatteryInfo tests', () {
@@ -104,10 +166,7 @@ void main() {
     });
 
     test('Parses from native battery data map', () {
-      final map = {
-        'level': 94,
-        'isCharging': false,
-      };
+      final map = {'level': 94, 'isCharging': false};
       final info = BatteryInfo.fromMap(map);
       expect(info.level, 94);
       expect(info.isCharging, false);

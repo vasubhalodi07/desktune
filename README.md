@@ -14,22 +14,26 @@
 
 Prop your phone on a desk or nightstand and DeskTune turns it into a calm,
 always-on display: a big clock on one side, and on the other a glass card for
-whatever you're listening to. It works with Amazon Music, Spotify and any other
-player that shows Android's media controls, so there's nothing to sign in to or
-set up per app.
+whatever you're listening to. It works with any music or podcast app that shows
+Android's media controls, such as Spotify, YouTube Music or Amazon Music, so
+there's nothing to sign in to or set up per app.
 
 ## Highlights
 
 - **A layout made for a desk.** Clock and now-playing side by side, in landscape
   only, on a true-black background that lets an OLED screen switch its pixels off.
 - **Music you can control from across the room.** Album art, title and artist,
-  a seek bar, and previous / play-pause / next.
+  a seek bar, and previous / play-pause / next. The player's own app icon
+  sits on the card, and tapping it or the album art jumps straight to that app.
 - **A card that matches the song.** The glass tint and glow are drawn from the
   colours of the current album artwork.
 - **Brightness and volume, one touch away.** Two slim sliders sit right under the
   card.
-- **Clock your way.** Choose whether to show the date and seconds, and tap the
-  expand button for a full-screen clock.
+- **Clock your way.** It follows your phone's 12- or 24-hour setting (or pick your
+  own), you choose whether to show the date and seconds, and the expand button
+  opens a full-screen clock.
+- **Kind to your screen.** The whole layout drifts a few pixels every minute, so
+  the same OLED pixels aren't lit for hours on end.
 - **Private by design.** DeskTune asks for no network permission. Track details
   are read on the phone and never leave it.
 

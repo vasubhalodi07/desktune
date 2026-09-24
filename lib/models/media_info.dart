@@ -3,6 +3,9 @@ import 'dart:typed_data';
 class MediaInfo {
   final bool hasActiveSession;
   final String packageName;
+
+  /// Display name of the player app (e.g. "Amazon Music"); empty if unknown.
+  final String appName;
   final String title;
   final String artist;
   final String album;
@@ -23,6 +26,7 @@ class MediaInfo {
   const MediaInfo({
     this.hasActiveSession = false,
     this.packageName = '',
+    this.appName = '',
     this.title = '',
     this.artist = '',
     this.album = '',
@@ -63,6 +67,7 @@ class MediaInfo {
     return MediaInfo(
       hasActiveSession: map['hasActiveSession'] as bool? ?? false,
       packageName: map['packageName'] as String? ?? '',
+      appName: map['appName'] as String? ?? '',
       title: map['title'] as String? ?? '',
       artist: map['artist'] as String? ?? '',
       album: map['album'] as String? ?? '',

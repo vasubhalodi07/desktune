@@ -107,6 +107,16 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                     result.error("APP_INFO_ERROR", e.localizedMessage, null)
                 }
             }
+            "getAppIcon" -> {
+                val packageName = call.argument<String>("packageName")
+                result.success(
+                    if (packageName == null) null
+                    else MediaSessionBridge.instance.appIconPng(packageName)
+                )
+            }
+            "openPlayerApp" -> {
+                result.success(MediaSessionBridge.instance.openPlayerApp())
+            }
             "getCurrentMedia" -> {
                 result.success(
                     MediaSessionBridge.instance.getCurrentMediaData(
@@ -174,9 +184,13 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                 }
                 result.success(true)
             }
+            "getSystemTimeFormat24" -> {
+                result.success(android.text.format.DateFormat.is24HourFormat(this))
+            }
             "getSettings" -> {
                 val prefs = getSharedPreferences("desktune_prefs", MODE_PRIVATE)
                 result.success(mapOf(
+                    "followSystemTimeFormat" to prefs.getBoolean("followSystemTimeFormat", true),
                     "is24HourFormat" to prefs.getBoolean("is24HourFormat", false),
                     "showSeconds" to prefs.getBoolean("showSeconds", false),
                     "showDate" to prefs.getBoolean("showDate", true),
@@ -187,6 +201,7 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             }
             "saveSettings" -> {
                 val prefs = getSharedPreferences("desktune_prefs", MODE_PRIVATE).edit()
+                call.argument<Boolean>("followSystemTimeFormat")?.let { prefs.putBoolean("followSystemTimeFormat", it) }
                 call.argument<Boolean>("is24HourFormat")?.let { prefs.putBoolean("is24HourFormat", it) }
                 call.argument<Boolean>("showSeconds")?.let { prefs.putBoolean("showSeconds", it) }
                 call.argument<Boolean>("showDate")?.let { prefs.putBoolean("showDate", it) }
