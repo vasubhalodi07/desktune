@@ -45,5 +45,4 @@ app.*.map.json
 /android/app/release
 
 # Versioned release APKs kept locally (named after the pubspec version)
-/build_version/
 AGENTS.md
